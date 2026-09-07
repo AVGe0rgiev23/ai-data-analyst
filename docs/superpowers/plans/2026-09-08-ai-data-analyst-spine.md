@@ -77,10 +77,12 @@ pnpm create next-app@latest ./_scaffold --ts --tailwind --app --src-dir=false --
 cp -r ./_scaffold/. ./ && rm -rf ./_scaffold
 ```
 
-- [ ] **Step 2: Initialise git and commit the scaffold**
+- [ ] **Step 2: Commit the scaffold**
+
+The repository already exists and you are on the `feat/ai-data-analyst-spine` branch — do not run
+`git init`. Confirm with `git branch --show-current`, then commit.
 
 ```bash
-git init
 git add -A
 git commit -m "chore: scaffold Next.js app"
 ```
@@ -887,23 +889,6 @@ export const columns = pgTable('columns', {
   position: integer('position').notNull(),
 });
 
-export const conversations = pgTable('conversations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  sourceId: uuid('source_id').references(() => sources.id, { onDelete: 'cascade' }).notNull(),
-  title: text('title').notNull().default('New analysis'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const messages = pgTable('messages', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  conversationId: uuid('conversation_id')
-    .references(() => conversations.id, { onDelete: 'cascade' })
-    .notNull(),
-  role: text('role', { enum: ['user', 'assistant'] }).notNull(),
-  parts: jsonb('parts').$type<unknown[]>().notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
 export const resultSets = pgTable('result_sets', {
   id: uuid('id').primaryKey().defaultRandom(),
   sourceId: uuid('source_id').references(() => sources.id, { onDelete: 'cascade' }).notNull(),
@@ -1149,7 +1134,7 @@ import { attachSource } from './attach';
 import { ingestCsvToParquet } from '@/lib/ingest/ingest';
 
 describe('attachSource', () => {
-  it('registers the parquet as a queryable view', async () => {
+  it('loads the parquet into a table that survives lockdown', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'attach-'));
     const parquet = join(dir, 'orders.parquet');
     await ingestCsvToParquet(
@@ -1201,8 +1186,13 @@ function quoteLiteral(value: string): string {
 }
 
 /**
- * Materialises the source's parquet into /tmp and exposes it as a view.
+ * Materialises the source's parquet into /tmp and loads it into a real TABLE.
  * Must run BEFORE lockdown(), because it needs filesystem and network access.
+ *
+ * A VIEW over read_parquet() would NOT work here: a view reads the file lazily at
+ * query time, which is after lockdown() has disabled filesystem access, so every
+ * query would fail. Loading into a table does the file read now, while access is
+ * still permitted.
  */
 export async function attachSource(
   session: DuckSession,
@@ -1213,7 +1203,7 @@ export async function attachSource(
   if (source.parquetUrl.startsWith('file:')) {
     const { fileURLToPath } = await import('node:url');
     await session.connection.run(
-      `CREATE OR REPLACE VIEW ${quoteIdent(source.tableName)} AS
+      `CREATE OR REPLACE TABLE ${quoteIdent(source.tableName)} AS
        SELECT * FROM read_parquet(${quoteLiteral(fileURLToPath(source.parquetUrl))})`,
     );
     return;
@@ -1226,7 +1216,7 @@ export async function attachSource(
   await writeFile(localPath, Buffer.from(await response.arrayBuffer()));
 
   await session.connection.run(
-    `CREATE OR REPLACE VIEW ${quoteIdent(source.tableName)} AS
+    `CREATE OR REPLACE TABLE ${quoteIdent(source.tableName)} AS
      SELECT * FROM read_parquet(${quoteLiteral(localPath)})`,
   );
 }
@@ -1283,7 +1273,7 @@ export async function POST(request: Request) {
   const session = await createSession();
   try {
     await session.connection.run(
-      `CREATE OR REPLACE VIEW "${tableName}" AS SELECT * FROM read_parquet('${parquetPath.replace(/'/g, "''")}')`,
+      `CREATE OR REPLACE TABLE "${tableName}" AS SELECT * FROM read_parquet('${parquetPath.replace(/'/g, "''")}')`,
     );
     const profile = await profileTable(session, tableName);
     const sourceId = await createSource({
@@ -1519,6 +1509,7 @@ git commit -m "feat: add upload dropzone and data profile card"
 ### Task 10: LLM-drafted column dictionary
 
 **Files:**
+- Create: `lib/ai/model.ts`
 - Create: `lib/profile/dictionary.ts`
 - Create: `app/api/sources/[id]/dictionary/route.ts`
 - Create: `app/api/columns/[id]/route.ts`
@@ -1580,14 +1571,21 @@ describe('buildDictionaryPrompt', () => {
 Run: `pnpm vitest run lib/profile/dictionary.test.ts`
 Expected: FAIL — cannot resolve `./dictionary`.
 
-- [ ] **Step 3: Implement `lib/profile/dictionary.ts`**
+- [ ] **Step 3: Create `lib/ai/model.ts`**
+
+The model id has exactly one home. Both the dictionary drafter and the agent import it from here.
+
+```ts
+export const MODEL = 'anthropic/claude-sonnet-5';
+```
+
+- [ ] **Step 4: Implement `lib/profile/dictionary.ts`**
 
 ```ts
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import type { SourceWithSchema } from '@/lib/db/sources';
-
-export const MODEL = 'anthropic/claude-sonnet-5';
+import { MODEL } from '@/lib/ai/model';
 
 export function buildDictionaryPrompt(source: SourceWithSchema): string {
   const pending = source.columns.filter((c) => c.descriptionSource !== 'user');
@@ -1626,12 +1624,12 @@ export async function draftDictionary(
 }
 ```
 
-- [ ] **Step 4: Run it and verify it passes**
+- [ ] **Step 5: Run it and verify it passes**
 
 Run: `pnpm vitest run lib/profile/dictionary.test.ts`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Implement the dictionary route**
+- [ ] **Step 6: Implement the dictionary route**
 
 Create `app/api/sources/[id]/dictionary/route.ts`:
 
@@ -1661,7 +1659,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 }
 ```
 
-- [ ] **Step 6: Implement the column edit route**
+- [ ] **Step 7: Implement the column edit route**
 
 Create `app/api/columns/[id]/route.ts`:
 
@@ -1681,15 +1679,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 ```
 
-- [ ] **Step 7: Make descriptions editable in `ProfileCard`**
+- [ ] **Step 8: Make descriptions editable in `ProfileCard`**
 
 Convert `ProfileCard` to a client component. Render each description as a click-to-edit input that `PATCH`es `/api/columns/[id]` on blur. Show a small "drafted by AI" marker when `descriptionSource === 'llm'` so the user knows which text has not been reviewed. Re-run `pnpm vitest run components/profile-card.test.tsx` and update the test if the marker changes the rendered text.
 
-- [ ] **Step 8: Verify end to end**
+- [ ] **Step 9: Verify end to end**
 
 Upload the fixture, click "Describe columns", confirm descriptions appear, edit one, reload, and confirm the edit persisted as `user`.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add -A
@@ -1713,7 +1711,6 @@ The engine is proven before any AI touches it. At the end of this phase a human 
 - Produces:
   - `assertReadOnly(session: DuckSession, sql: string): Promise<GuardResult>`
   - `GuardResult = { ok: true } | { ok: false; reason: string }`
-  - `class SqlGuardError extends Error`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1786,13 +1783,6 @@ Expected: FAIL — cannot resolve `./guard`.
 import type { DuckSession } from '@/lib/duckdb/session';
 
 export type GuardResult = { ok: true } | { ok: false; reason: string };
-
-export class SqlGuardError extends Error {
-  constructor(reason: string) {
-    super(reason);
-    this.name = 'SqlGuardError';
-  }
-}
 
 function quoteLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
@@ -1877,7 +1867,7 @@ git commit -m "feat: add parser-based read-only sql guard"
 - Test: `lib/sql/execute.test.ts`
 
 **Interfaces:**
-- Consumes: `DuckSession` (Task 4), `assertReadOnly`/`SqlGuardError` (Task 11), `toJsonSafe` (Task 6)
+- Consumes: `DuckSession` (Task 4), `assertReadOnly` (Task 11), `toJsonSafe` (Task 6)
 - Produces:
   - `runQuery(session: DuckSession, sql: string, options?: RunOptions): Promise<QueryResult>`
   - `RunOptions = { rowLimit?: number; timeoutMs?: number }` (defaults 1000 / 15000)
@@ -2456,6 +2446,7 @@ git commit -m "feat: add editable sql runner and result table"
 
 **Interfaces:**
 - Consumes: `SourceWithSchema` (Task 7), `runAgainstSource` (Task 13), `SqlExecutionError` (Task 12)
+- Consumes also: `MODEL` from `lib/ai/model.ts` (Task 10), re-exported for convenience
 - Produces:
   - `buildSystemPrompt(source: SourceWithSchema): string`
   - `createTools(sourceId: string, source: SourceWithSchema)` returning `{ get_schema, run_sql }` (extended in Task 18 with `make_chart`)
@@ -2516,7 +2507,7 @@ Expected: FAIL — cannot resolve `./prompt`.
 ```ts
 import type { SourceWithSchema } from '@/lib/db/sources';
 
-export const MODEL = 'anthropic/claude-sonnet-5';
+export { MODEL } from '@/lib/ai/model';
 
 export function buildSystemPrompt(source: SourceWithSchema): string {
   const columnLines = source.columns.map((column) => {
@@ -3036,7 +3027,22 @@ export function ChatPanel({
 
 - [ ] **Step 7: Build the split layout in `app/page.tsx`**
 
-Left column: `ChatPanel`. Right column: tabs for **Answer / Chart / Data / SQL**, where Data renders `ResultTable` for the latest `result_id` and SQL renders `SqlRunner` seeded with that result's SQL. Fetch a result by id through a new `GET /api/results/[id]` route that calls `getResult`.
+First create `app/api/results/[id]/route.ts`, which the canvas needs to load a result by id:
+
+```ts
+import { getResult } from '@/lib/db/results';
+
+export const runtime = 'nodejs';
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const result = await getResult(id);
+  if (!result) return Response.json({ error: 'Not found' }, { status: 404 });
+  return Response.json(result);
+}
+```
+
+Then build the layout: left column `ChatPanel`; right column tabs for **Answer / Chart / Data / SQL**, where Data renders `ResultTable` for the latest `result_id` and SQL renders `SqlRunner` seeded with that result's SQL.
 
 - [ ] **Step 8: Verify in the browser**
 
@@ -3140,7 +3146,7 @@ Expected: FAIL — cannot resolve `./spec`.
 import { z } from 'zod';
 
 export const chartSpecSchema = z.object({
-  type: z.enum(['bar', 'line', 'area', 'scatter', 'pie', 'heatmap']),
+  type: z.enum(['bar', 'line', 'area', 'scatter', 'pie']),
   title: z.string().min(1),
   x: z.string().min(1),
   y: z.array(z.string().min(1)).min(1),
@@ -3469,8 +3475,6 @@ export function ChartView({ spec, rows }: { spec: ChartSpec; rows: Record<string
 }
 ```
 
-`heatmap` is in the spec enum but has no dedicated Recharts renderer, so it falls through to the bar branch. If the model picks it often, add a real renderer; otherwise remove `heatmap` from the enum in Task 18. Decide based on observed behaviour, and do not leave both.
-
 - [ ] **Step 4: Run it and verify it passes**
 
 Run: `pnpm vitest run components/chart-view.test.tsx`
@@ -3489,29 +3493,17 @@ git commit -m "feat: render validated chart specs with recharts"
 
 **Files:**
 - Modify: `components/chat-panel.tsx`, `app/page.tsx`
-- Create: `app/api/results/[id]/route.ts`
 - Create: `components/canvas.tsx`
 
 **Interfaces:**
 - Consumes: `ChartView` (Task 20), `ResultTable` (Task 14), `SqlRunner` (Task 14), `getResult` (Task 13)
 - Produces:
-  - `GET /api/results/[id]` returning `StoredResult`
   - `<Canvas resultId={string | null} spec={ChartSpec | null} sourceId={string} />` with Answer / Chart / Data / SQL tabs
 
-- [ ] **Step 1: Implement the result read route**
+- [ ] **Step 1: Verify the result read route exists**
 
-```ts
-import { getResult } from '@/lib/db/results';
-
-export const runtime = 'nodejs';
-
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const result = await getResult(id);
-  if (!result) return Response.json({ error: 'Not found' }, { status: 404 });
-  return Response.json(result);
-}
-```
+`app/api/results/[id]/route.ts` was created in Task 17. Confirm it is present and returns a result
+by id before wiring the canvas to it.
 
 - [ ] **Step 2: Lift chart specs out of the message stream**
 
