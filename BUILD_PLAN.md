@@ -36,7 +36,7 @@ These are requirements, not aspirations. Each maps to a concrete implementation 
 4. **Numeric-claim validation.** *(Implemented — `lib/validate/claims.ts`, `POST /api/validate`.)* After the final answer, a deterministic pass extracts every number from the prose and confirms it appears in a cited result set. Unmatched numbers are flagged in the UI. A second, conservative detector flags quantitative *comparisons* measured by something no cited result contains — the class of error that carries no number at all, such as "the smallest customer by order count" over a result holding only revenue. Rows are loaded server-side by `result_id`; anything else in the request is ignored, and a result belonging to another source cannot lend support. Flags annotate the answer, never suppress it.
 5. **Stated assumptions, always.** How the agent interpreted "top customers" or "last quarter" is part of the answer. Genuine ambiguity triggers `ask_clarification` instead of a guess.
 6. **Verifiable by hand.** SQL is always shown and always editable, and re-running edited SQL bypasses the model entirely.
-7. **Measured, not assumed.** An eval set of ~20 questions over a known dataset with hand-computed expected answers, runnable as a script.
+7. **Measured, not assumed.** *(Implemented — `lib/eval/`, `pnpm eval`.)* An eval set of 20 questions plus 6 validator cases over a known 16-row dataset, every expected answer hand-computed and independently re-derived from the raw CSV. Runnable as a script against a live instance over HTTP. The engine and validator layers score 26/26; the agent layer is built and awaits model quota.
 
 ## Architecture
 

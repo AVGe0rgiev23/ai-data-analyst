@@ -21,9 +21,9 @@ Last updated 2026-09-08.
 | 2 — SQL engine | 11, 12, 13, 14 | Done |
 | 3 — Agent | 15, 16, 17 | Done — verified against real data on OpenRouter free models |
 | 4 — Charts | 18, 19, 20, 21 | Done — deployed and verified on Vercel |
-| 8 — Claims validator | — | Done — the numeric-claim validator half of Phase 8. The eval set is still outstanding. |
+| 8 — Accuracy harness | — | Validator done. Eval set done for the engine and validator layers (26/26); the agent layer is built but unrun, blocked on free-tier quota. |
 
-`pnpm test` is green (160 tests), `tsc --noEmit` and `pnpm lint` clean, `pnpm build` succeeds.
+`pnpm test` is green (207 tests), `tsc --noEmit` and `pnpm lint` clean, `pnpm build` succeeds.
 
 Divergences applied while implementing, each recorded in its commit message:
 
@@ -73,6 +73,28 @@ The gap found in Phase 4 is now covered by a deterministic validator. No model i
 Verified over HTTP against a real stored result set: the Phase 4 answer's three revenue figures come
 back supported, while "the smallest customer by order count" is flagged as never queried, and the
 derived "$34.25" is flagged as in no result set.
+
+## Evaluation set (Phase 8, second half)
+
+`pnpm eval` runs the set against a live instance over HTTP. Fixture:
+`lib/eval/__fixtures__/orders-eval.csv`, 16 rows, built so the obvious answers diverge — the
+revenue leader (Globex, 835.75), the order-count leader (Acme, 5) and the paid-revenue leader
+(Acme, 760.00) are deliberately different customers. An agent that conflates revenue with order
+count, or reads sample rows instead of querying, gets q16, q17 and q18 wrong.
+
+Every expected value in `lib/eval/questions.ts` is hand-computed and written as a literal.
+`expectations.test.ts` recomputes all of them from the raw CSV in plain TypeScript, touching
+neither DuckDB nor the agent — without that, the eval would be checking the system against itself.
+
+Three layers, reported separately because they fail for different reasons:
+
+| Layer | What it measures | Result |
+|---|---|---|
+| engine | 20 reference queries through `POST /api/query` vs hand-computed rows | 20/20 |
+| claims | 6 answers through `POST /api/validate` vs required flags | 6/6 |
+| agent | each question through `POST /api/chat`, then validated | built, unrun — free-tier quota |
+
+Run the agent layer with `pnpm eval --agent` once quota allows.
 
 ### Limits
 

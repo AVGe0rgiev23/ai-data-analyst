@@ -1,0 +1,17 @@
+order_id,customer,region,amount,status,ordered_at
+1,Acme,North,100.00,paid,2026-01-05
+2,Globex,South,250.00,paid,2026-01-12
+3,Initech,North,75.50,pending,2026-01-19
+4,Acme,North,200.00,paid,2026-02-02
+5,Globex,South,125.25,refunded,2026-02-09
+6,Umbrella,East,300.00,paid,2026-02-16
+7,Acme,North,50.00,pending,2026-02-23
+8,Initech,North,175.00,paid,2026-03-02
+9,Globex,South,400.00,paid,2026-03-09
+10,Umbrella,East,25.75,refunded,2026-03-16
+11,Acme,North,150.00,paid,2026-03-23
+12,Initech,North,90.00,paid,2026-04-06
+13,Globex,South,60.50,pending,2026-04-13
+14,Umbrella,East,220.00,paid,2026-04-20
+15,Acme,North,310.00,paid,2026-05-04
+16,Initech,North,45.25,paid,2026-05-11

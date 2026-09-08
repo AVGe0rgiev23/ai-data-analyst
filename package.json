@@ -13,7 +13,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:push": "dotenv -e .env.local -- drizzle-kit push"
+    "db:push": "dotenv -e .env.local -- drizzle-kit push",
+    "eval": "dotenv -e .env.local -- tsx scripts/eval.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.96",
