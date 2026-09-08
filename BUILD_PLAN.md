@@ -24,7 +24,7 @@ A web app where a user uploads a CSV/Excel file, connects a Postgres/MySQL datab
 | State | Auth + saved conversations + shareable links | Feels like a product, not a toy |
 | Schema context | Auto-profile + LLM-drafted, user-editable dictionary | Zero setup, improves with corrections |
 | Sandbox | Vercel Sandbox | Same platform, no extra vendor |
-| Model | `anthropic/claude-sonnet-5` via Vercel AI Gateway | Gateway gives fallback and observability |
+| Model | `openrouter/free` via OpenRouter | Free models, no credit card and no paid credits. The free router spreads load across free models that support tool calling, so one being rate limited or withdrawn is survivable. Superseded the AI Gateway, which returns 403 `customer_verification_required` until a card is on file. |
 
 ## Accuracy principles
 
@@ -42,7 +42,7 @@ These are requirements, not aspirations. Each maps to a concrete implementation 
 
 - **Framework:** Next.js 16 App Router, TypeScript, Tailwind + shadcn/ui
 - **Runtime:** Vercel Functions, Fluid Compute, Node 24 (no Edge — DuckDB is a native module)
-- **AI:** AI SDK v6 via AI Gateway, `streamText` with tools and `stopWhen: stepCountIs(12)`
+- **AI:** AI SDK via OpenRouter (`@openrouter/ai-sdk-provider`), `streamText` with tools and `stopWhen: stepCountIs(12)`
 - **SQL engine:** `@duckdb/node-api` in-process, one DuckDB instance per request, data staged in `/tmp`
 - **Python:** Vercel Sandbox, created per analysis step, receives the input result set as Parquet
 - **App DB:** Neon Postgres (via Vercel Marketplace) with Drizzle

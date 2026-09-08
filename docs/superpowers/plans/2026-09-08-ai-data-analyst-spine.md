@@ -19,7 +19,7 @@ Last updated 2026-09-08.
 | 0 — Scaffold | 1, 2, 3 | Done |
 | 1 — Data in | 4, 5, 6, 7, 8, 9, 10 | Done |
 | 2 — SQL engine | 11, 12, 13, 14 | Done |
-| 3 — Agent | 15, 16, 17 | **Blocked** — AI Gateway returns 403 `customer_verification_required` until a card is on file for the team |
+| 3 — Agent | 15, 16, 17 | Not started — provider migrated to OpenRouter free models; needs `OPENROUTER_API_KEY` |
 | 4 — Charts | 18, 19, 20, 21 | Not started |
 
 `pnpm test` is green (55 tests), `tsc --noEmit` and `pnpm lint` clean, `pnpm build` succeeds.
@@ -46,8 +46,9 @@ Divergences applied while implementing, each recorded in its commit message:
 - **Node 24 runtime, never Edge.** DuckDB is a native module. Every route that touches DuckDB declares `export const runtime = 'nodejs'`.
 - **Package manager: pnpm.** All install commands use `pnpm`.
 - **DuckDB SQL is the only dialect.** No dialect translation anywhere in the codebase.
-- **All model calls go through Vercel AI Gateway** using plain `"provider/model"` strings. Never install `@ai-sdk/anthropic` or any provider-specific package.
-- **Model id:** `anthropic/claude-sonnet-5`.
+- **All model calls go through OpenRouter** via `getModel()` in `lib/ai/model.ts`. Vercel AI Gateway is not used: it returns 403 `customer_verification_required` until a card is on file.
+- **Model id:** `openrouter/free` (free router). The app must never incur spend.
+- **Every model call is wrapped by `toFriendlyAiError`** from `lib/ai/errors.ts`. Free-tier 429s are routine and must surface as a wait-and-retry message, never as a crash.
 - **Read-only enforcement is parser-based.** Regex-based SQL guards are forbidden.
 - **Row cap: 1000.** `rowCount` always means *rows actually returned*, never an estimated table total. When the cap is hit, `truncated` is `true` and no total is claimed.
 - **Query timeout: 15000 ms.**
