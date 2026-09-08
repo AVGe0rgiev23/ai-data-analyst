@@ -40,3 +40,6 @@ next-env.d.ts
 
 # superpowers (local planning artifacts)
 .superpowers/
+
+.vercel
+.env*
