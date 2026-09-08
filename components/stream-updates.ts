@@ -7,7 +7,10 @@ export type StreamPart = {
 };
 
 export type StreamUpdates = {
+  /** The latest result, which the canvas shows. */
   resultId: string | null;
+  /** Every result the turn produced — the set a claim may cite. */
+  resultIds: string[];
   chart: { spec: ChartSpec; resultId: string } | null;
   text: string;
 };
@@ -21,12 +24,14 @@ export type StreamUpdates = {
  */
 export function extractStreamUpdates(parts: StreamPart[]): StreamUpdates {
   let resultId: string | null = null;
+  const resultIds: string[] = [];
   let chart: { spec: ChartSpec; resultId: string } | null = null;
   const text: string[] = [];
 
   for (const part of parts) {
     if (part.type === 'tool-run_sql' && part.output?.result_id) {
       resultId = part.output.result_id;
+      if (!resultIds.includes(resultId)) resultIds.push(resultId);
     }
     if (part.type === 'tool-make_chart' && part.output?.spec && part.output.result_id) {
       chart = { spec: part.output.spec, resultId: part.output.result_id };
@@ -36,7 +41,7 @@ export function extractStreamUpdates(parts: StreamPart[]): StreamUpdates {
     }
   }
 
-  return { resultId, chart, text: text.join('') };
+  return { resultId, resultIds, chart, text: text.join('') };
 }
 
 /** Stable identity for a chart, so an unchanged one is not re-emitted. */

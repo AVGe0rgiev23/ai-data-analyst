@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { StepTimeline } from './step-timeline';
 import type { ChartSpec } from '@/lib/charts/spec';
 import { extractStreamUpdates, chartKey, type StreamPart } from './stream-updates';
+import { ClaimFlags } from './claim-flags';
+import type { ValidationReport } from '@/lib/validate/claims';
 
 export function ChatPanel({
   sourceId,
@@ -19,6 +21,7 @@ export function ChatPanel({
   onAnswer?: (answer: string) => void;
 }) {
   const [input, setInput] = useState('');
+  const [reports, setReports] = useState<Record<string, ValidationReport>>({});
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat', body: { sourceId } }),
   });
@@ -56,6 +59,29 @@ export function ChatPanel({
 
   const busy = status === 'streaming' || status === 'submitted';
 
+  // Validation runs after the turn settles, against the server's stored rows.
+  // It never gates rendering: the answer is already on screen by this point,
+  // and a finding annotates it rather than hiding it.
+  const validated = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (busy) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant' || validated.current.has(last.id)) return;
+
+    const { text, resultIds } = extractStreamUpdates(last.parts as StreamPart[]);
+    if (!text) return;
+    validated.current.add(last.id);
+
+    void fetch('/api/validate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sourceId, resultIds, text }),
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((report) => report && setReports((all) => ({ ...all, [last.id]: report })))
+      .catch(() => undefined);
+  }, [busy, messages, sourceId]);
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
@@ -77,6 +103,7 @@ export function ChatPanel({
                 </p>
               ) : null,
             )}
+            {message.role === 'assistant' && <ClaimFlags report={reports[message.id] ?? null} />}
           </div>
         ))}
         {busy && <p className="text-xs text-neutral-500">Thinking…</p>}

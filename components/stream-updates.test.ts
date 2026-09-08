@@ -44,6 +44,18 @@ describe('extractStreamUpdates', () => {
     ]);
     expect(updates.text).toBe('Globex spent the most.');
   });
+
+
+  it('collects every result the turn produced, not just the latest', () => {
+    // A claim may cite any result from the turn, so validation needs them all.
+    const updates = extractStreamUpdates([
+      { type: 'tool-run_sql', output: { result_id: 'r1' } },
+      { type: 'tool-run_sql', output: { result_id: 'r2' } },
+      { type: 'tool-run_sql', output: { result_id: 'r1' } },
+    ]);
+    expect(updates.resultIds).toEqual(['r1', 'r2']);
+    expect(updates.resultId).toBe('r1');
+  });
 });
 
 describe('chartKey', () => {
