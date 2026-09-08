@@ -43,18 +43,22 @@ export async function createSource(input: NewSource): Promise<string> {
     })
     .returning({ id: sources.id });
 
-  await db.insert(columns).values(
-    input.profile.columns.map((column, position) => ({
-      sourceId: row.id,
-      name: column.name,
-      type: column.type,
-      nullPercentage: column.nullPercentage,
-      approxUnique: column.approxUnique,
-      min: column.min,
-      max: column.max,
-      position,
-    })),
-  );
+  // Drizzle rejects an empty values() outright, so a column-less profile would
+  // throw rather than simply store no columns.
+  if (input.profile.columns.length > 0) {
+    await db.insert(columns).values(
+      input.profile.columns.map((column, position) => ({
+        sourceId: row.id,
+        name: column.name,
+        type: column.type,
+        nullPercentage: column.nullPercentage,
+        approxUnique: column.approxUnique,
+        min: column.min,
+        max: column.max,
+        position,
+      })),
+    );
+  }
 
   return row.id;
 }
