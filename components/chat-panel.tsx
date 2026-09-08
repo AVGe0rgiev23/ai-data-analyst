@@ -2,30 +2,57 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StepTimeline } from './step-timeline';
+import type { ChartSpec } from '@/lib/charts/spec';
+import { extractStreamUpdates, chartKey, type StreamPart } from './stream-updates';
 
 export function ChatPanel({
   sourceId,
   onResultId,
+  onChartSpec,
+  onAnswer,
 }: {
   sourceId: string;
   onResultId: (resultId: string) => void;
+  onChartSpec?: (spec: ChartSpec, resultId: string) => void;
+  onAnswer?: (answer: string) => void;
 }) {
   const [input, setInput] = useState('');
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat', body: { sourceId } }),
   });
 
+  // Each handler fires only when its value actually changes. useChat hands back
+  // a fresh messages array on every render, so re-emitting unconditionally made
+  // the parent set state, re-render, and run this again — "Maximum update depth
+  // exceeded".
+  const lastResultId = useRef<string | null>(null);
+  const lastChartKey = useRef<string | null>(null);
+  const lastAnswer = useRef<string>('');
+
   useEffect(() => {
     const last = messages[messages.length - 1];
-    if (!last) return;
-    for (const part of last.parts as { type: string; output?: { result_id?: string } }[]) {
-      if (part.type === 'tool-run_sql' && part.output?.result_id) {
-        onResultId(part.output.result_id);
-      }
+    if (!last || last.role !== 'assistant') return;
+
+    const updates = extractStreamUpdates(last.parts as StreamPart[]);
+
+    if (updates.resultId && updates.resultId !== lastResultId.current) {
+      lastResultId.current = updates.resultId;
+      onResultId(updates.resultId);
     }
-  }, [messages, onResultId]);
+
+    const key = chartKey(updates.chart);
+    if (updates.chart && key !== lastChartKey.current) {
+      lastChartKey.current = key;
+      onChartSpec?.(updates.chart.spec, updates.chart.resultId);
+    }
+
+    if (updates.text && updates.text !== lastAnswer.current) {
+      lastAnswer.current = updates.text;
+      onAnswer?.(updates.text);
+    }
+  }, [messages, onResultId, onChartSpec, onAnswer]);
 
   const busy = status === 'streaming' || status === 'submitted';
 
