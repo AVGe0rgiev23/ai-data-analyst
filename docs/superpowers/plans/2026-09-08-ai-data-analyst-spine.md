@@ -10,6 +10,37 @@
 
 **Spec:** `BUILD_PLAN.md`
 
+## Progress
+
+Last updated 2026-09-08.
+
+| Phase | Tasks | Status |
+|---|---|---|
+| 0 — Scaffold | 1, 2, 3 | Done |
+| 1 — Data in | 4, 5, 6, 7, 8, 9, 10 | Done |
+| 2 — SQL engine | 11, 12, 13, 14 | Done |
+| 3 — Agent | 15, 16, 17 | **Blocked** — AI Gateway returns 403 `customer_verification_required` until a card is on file for the team |
+| 4 — Charts | 18, 19, 20, 21 | Not started |
+
+`pnpm test` is green (55 tests), `tsc --noEmit` and `pnpm lint` clean, `pnpm build` succeeds.
+
+Divergences applied while implementing, each recorded in its commit message:
+
+- Task 6 — the `toJsonSafe` test asserted an object literal stringifies; an object literal is a
+  plain object and correctly takes the plain-object branch. Test now uses a class instance plus a
+  real `DuckDBDateValue`.
+- Task 12 — a timed-out query is now `interrupt()`ed. Racing the timeout alone left the query
+  running and queued every later statement behind it (16.5s vs 1.0s on a session-reuse test).
+- Task 7 — `result_sets.truncated` is a real `boolean`, not text `'true'`/`'false'`. Task 13's
+  `saveResult`/`getResult` therefore carry no string casts.
+- Task 8 — uploads are written to Blob with `access: 'private'`, not `'public'`; `attachSource`
+  reads them back with the store token.
+- Task 10 — the `buildDictionaryPrompt` test asserted the whole prompt omits a user-described
+  column's name, but sample rows legitimately contain it; narrowed to the ask-list lines.
+  Also enabled vitest `globals: true` so Testing Library registers DOM cleanup.
+- Task 13 — fixed `createSource` throwing on a column-less profile (Drizzle rejects an empty
+  `values()`).
+
 ## Global Constraints
 
 - **Node 24 runtime, never Edge.** DuckDB is a native module. Every route that touches DuckDB declares `export const runtime = 'nodejs'`.
