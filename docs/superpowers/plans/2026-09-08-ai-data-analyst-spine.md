@@ -19,10 +19,10 @@ Last updated 2026-09-08.
 | 0 — Scaffold | 1, 2, 3 | Done |
 | 1 — Data in | 4, 5, 6, 7, 8, 9, 10 | Done |
 | 2 — SQL engine | 11, 12, 13, 14 | Done |
-| 3 — Agent | 15, 16, 17 | Not started — provider migrated to OpenRouter free models; needs `OPENROUTER_API_KEY` |
+| 3 — Agent | 15, 16, 17 | Done — verified against real data on OpenRouter free models |
 | 4 — Charts | 18, 19, 20, 21 | Not started |
 
-`pnpm test` is green (55 tests), `tsc --noEmit` and `pnpm lint` clean, `pnpm build` succeeds.
+`pnpm test` is green (99 tests), `tsc --noEmit` and `pnpm lint` clean, `pnpm build` succeeds.
 
 Divergences applied while implementing, each recorded in its commit message:
 
@@ -40,6 +40,14 @@ Divergences applied while implementing, each recorded in its commit message:
   Also enabled vitest `globals: true` so Testing Library registers DOM cleanup.
 - Task 13 — fixed `createSource` throwing on a column-less profile (Drizzle rejects an empty
   `values()`).
+- Task 15 — `prompt.ts` re-exports `getModel`, not the plan's `MODEL` constant, which no longer
+  exists after the OpenRouter migration.
+- Task 16 — `convertToModelMessages` is async in AI SDK v7 and must be awaited. Stream errors are
+  mapped through `toFriendlyAiError` via `toUIMessageStreamResponse({ onError })`, since a
+  mid-stream rate limit cannot change the response status.
+- Task 16 — the plan's expected answer ("Acme at 360.75") is wrong; Globex at 395.00 is correct.
+- Task 17 — three prompt rules added after a real run showed the agent totalling `sample_rows`
+  itself rather than querying. Phase 8's numeric-claim validator remains the durable fix.
 
 ## Global Constraints
 
