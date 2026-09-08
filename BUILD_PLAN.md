@@ -24,7 +24,7 @@ A web app where a user uploads a CSV/Excel file, connects a Postgres/MySQL datab
 | State | Auth + saved conversations + shareable links | Feels like a product, not a toy |
 | Schema context | Auto-profile + LLM-drafted, user-editable dictionary | Zero setup, improves with corrections |
 | Sandbox | Vercel Sandbox | Same platform, no extra vendor |
-| Model | `openrouter/free` via OpenRouter | Free models, no credit card and no paid credits. The free router spreads load across free models that support tool calling, so one being rate limited or withdrawn is survivable. Superseded the AI Gateway, which returns 403 `customer_verification_required` until a card is on file. |
+| Model | `dots-studio/dots-3-note-preview:free` via OpenRouter, with a fallback chain | Free models, no credit card and no paid credits. Verified to do both tool calling and structured output; fallbacks absorb free-tier rate limits. Superseded the AI Gateway, which returns 403 `customer_verification_required` until a card is on file. |
 
 ## Accuracy principles
 

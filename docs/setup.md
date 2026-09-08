@@ -110,9 +110,16 @@ Free models are rate limited: roughly 20 requests per minute, and a daily cap
 that is much lower for accounts that have never bought credits than for those
 that have. The app treats a 429 as a normal condition — `lib/ai/errors.ts` maps
 it to a message telling the user how long to wait, rather than failing opaquely.
-The configured model is `openrouter/free` (see `lib/ai/model.ts`), OpenRouter's
-free router, which spreads load across whichever free models are currently
-available and support the request's tool-calling and structured-output needs.
+The configured model is `dots-studio/dots-3-note-preview:free` (see
+`lib/ai/model.ts`), with a fallback chain OpenRouter tries in order when a model
+is rate limited or its upstream provider is overloaded.
+
+`openrouter/free` — OpenRouter's own free router — was tried first and rejected:
+it selects a free model at random, and many free models ignore a JSON schema, so
+structured-output calls came back as markdown prose. The pinned models were each
+verified against the real API to do tool calling, and the first two to honour
+structured output. Note OpenRouter rejects a fallback list longer than three
+entries with a 400.
 
 ## 6. Pull environment variables locally
 

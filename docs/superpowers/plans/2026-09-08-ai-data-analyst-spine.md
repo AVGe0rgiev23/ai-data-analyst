@@ -47,7 +47,7 @@ Divergences applied while implementing, each recorded in its commit message:
 - **Package manager: pnpm.** All install commands use `pnpm`.
 - **DuckDB SQL is the only dialect.** No dialect translation anywhere in the codebase.
 - **All model calls go through OpenRouter** via `getModel()` in `lib/ai/model.ts`. Vercel AI Gateway is not used: it returns 403 `customer_verification_required` until a card is on file.
-- **Model id:** `openrouter/free` (free router). The app must never incur spend.
+- **Model id:** `MODEL_ID` in `lib/ai/model.ts` (`dots-studio/dots-3-note-preview:free`) with a fallback chain. Every id must end in `:free` — the app must never incur spend.
 - **Every model call is wrapped by `toFriendlyAiError`** from `lib/ai/errors.ts`. Free-tier 429s are routine and must surface as a wait-and-retry message, never as a crash.
 - **Read-only enforcement is parser-based.** Regex-based SQL guards are forbidden.
 - **Row cap: 1000.** `rowCount` always means *rows actually returned*, never an estimated table total. When the cap is hit, `truncated` is `true` and no total is claimed.
