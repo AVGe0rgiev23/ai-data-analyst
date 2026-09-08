@@ -139,7 +139,18 @@ export function ProfileCard({
                 {column.approxUnique.toLocaleString()} distinct
               </span>
             </div>
-            <ColumnDescription column={column} />
+            {/*
+              Keyed on the server-provided description so refreshed data
+              remounts the editor with the new text. Without this, the
+              useState initialiser inside it only ever runs once and newly
+              drafted descriptions never appear. The key is unchanged by a
+              plain parent re-render, so an unsaved or just-saved local edit
+              survives.
+            */}
+            <ColumnDescription
+              key={`${column.id}:${column.descriptionSource ?? 'none'}:${column.description ?? ''}`}
+              column={column}
+            />
           </li>
         ))}
       </ul>

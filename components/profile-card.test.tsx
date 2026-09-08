@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { ProfileCard } from './profile-card';
 
 const source = {
@@ -81,5 +81,44 @@ describe('ProfileCard', () => {
       expect(screen.getByText(/free-tier rate limit was reached/i)).toBeDefined(),
     );
     expect(screen.getByText(/about 30 seconds/i)).toBeDefined();
+  });
+
+  it('shows descriptions that arrive after the first render', () => {
+    // Regression: ColumnDescription seeded its state with useState(initial),
+    // whose initialiser only runs on mount. When "Describe columns" refreshed
+    // the source, the newly drafted text never appeared.
+    const { rerender } = render(<ProfileCard source={source} onSourceUpdated={() => {}} />);
+    expect(screen.getByText('Order total')).toBeDefined();
+
+    const drafted = {
+      ...source,
+      columns: [
+        {
+          ...source.columns[0],
+          description: 'Gross value of the order',
+          descriptionSource: 'llm' as const,
+        },
+      ],
+    };
+    rerender(<ProfileCard source={drafted} onSourceUpdated={() => {}} />);
+
+    expect(screen.getByText('Gross value of the order')).toBeDefined();
+    expect(screen.queryByText('Order total')).toBeNull();
+  });
+
+  it('keeps a just-saved edit when the parent re-renders unchanged props', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = render(<ProfileCard source={source} />);
+    fireEvent.click(screen.getByText('Order total'));
+    const input = screen.getByLabelText('Description for amount');
+    fireEvent.change(input, { target: { value: 'Edited by hand' } });
+    await act(async () => {
+      fireEvent.blur(input);
+    });
+
+    rerender(<ProfileCard source={source} />);
+    expect(screen.getByText('Edited by hand')).toBeDefined();
   });
 });
