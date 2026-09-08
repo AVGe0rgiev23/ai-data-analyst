@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateClaims } from './claims';
+import { validateClaims, normaliseUnicode } from './claims';
 import type { StoredResult } from '@/lib/db/results';
 
 function result(partial: Partial<StoredResult> = {}): StoredResult {
@@ -203,5 +203,108 @@ describe('report shape', () => {
   it('returns supported claims too, so the UI can show what was checked', () => {
     const report = validateClaims('Globex spent $395.00.', [result()]);
     expect(report.claims.some((c) => c.supported)).toBe(true);
+  });
+});
+
+// U+2011 non-breaking hyphen, U+202F narrow no-break space — both observed in
+// the Groq baseline, where they turned real answers into fabricated failures.
+const NB_HYPHEN = '‑';
+const NARROW_NBSP = ' ';
+
+describe('unicode normalisation', () => {
+  it('folds non-breaking hyphens to ASCII so a UUID is still a UUID', () => {
+    const id = `2ba6c05b${NB_HYPHEN}aa43${NB_HYPHEN}43aa${NB_HYPHEN}a4d4${NB_HYPHEN}2093d42f5167`;
+    expect(normaliseUnicode(id)).toBe('2ba6c05b-aa43-43aa-a4d4-2093d42f5167');
+  });
+
+  it('joins digits split by a narrow no-break space', () => {
+    expect(normaliseUnicode(`1${NARROW_NBSP}195.75`)).toBe('1195.75');
+  });
+
+  it('leaves an ASCII space between digits alone, since it is ambiguous', () => {
+    // "1 apple 195.75" must not silently become 1195.75.
+    expect(normaliseUnicode('1 195.75')).toBe('1 195.75');
+  });
+
+  it('leaves ordinary ASCII text untouched', () => {
+    const text = 'Revenue was $395.00 across 3 customers - see result 2ba6c05b-aa43-43aa-a4d4-2093d42f5167.';
+    expect(normaliseUnicode(text)).toBe(text);
+  });
+});
+
+describe('claims written with unicode punctuation', () => {
+  it('never turns UUID digits into numeric claims', () => {
+    const answer = `Revenue by customer (result b105e80d${NB_HYPHEN}e11c${NB_HYPHEN}4bb7${NB_HYPHEN}8e7a${NB_HYPHEN}74bd3e390862).`;
+    expect(unsupportedTexts(answer)).toEqual([]);
+  });
+
+  it('never turns date digits into numeric claims', () => {
+    const answer = `Revenue for 2026${NB_HYPHEN}01${NB_HYPHEN}01 and 2026-02-01 was reported.`;
+    expect(unsupportedTexts(answer)).toEqual([]);
+  });
+
+  it('reads a unicode thousands separator as one number', () => {
+    const r = result({
+      columns: [{ name: 'region', type: 'VARCHAR' }, { name: 'total_revenue', type: 'DOUBLE' }],
+      rows: [{ region: 'North', total_revenue: 1195.75 }],
+      rowCount: 1,
+    });
+    expect(unsupportedTexts(`North totalled 1${NARROW_NBSP}195.75.`, [r])).toEqual([]);
+  });
+
+  it('still flags a genuinely unsupported figure written with unicode punctuation', () => {
+    // Normalisation must not become a way to smuggle a number past the check.
+    expect(unsupportedTexts(`Globex leads by 1${NARROW_NBSP}234.56.`)).toContain('1234.56');
+  });
+});
+
+describe('schema metadata as evidence', () => {
+  const schema = { tableName: 'orders_eval', rowCount: 16 };
+  // Deliberately holds no value that rounds to 16 — the default fixture's 15.75
+  // does, and would legitimately support "16" as a rounding before schema
+  // evidence was ever consulted.
+  const plain = () =>
+    result({ rows: [{ customer: 'Globex', total_revenue: 395 }], rowCount: 1 });
+
+  it('supports a row count that matches the stored metadata', () => {
+    const report = validateClaims('There are 16 orders.', [plain()], schema);
+    expect(report.unsupported).toEqual([]);
+    expect(report.claims[0].supportedBy).toBe('schema');
+  });
+
+  it('rejects a row count that does not match', () => {
+    const report = validateClaims('There are 17 orders.', [plain()], schema);
+    expect(report.unsupported.map((c) => c.text)).toContain('17');
+  });
+
+  it('accepts the generic noun for rows as well as the table name', () => {
+    expect(validateClaims('All 16 rows were included.', [plain()], schema).unsupported).toEqual([]);
+  });
+
+  it('does not let the row count vouch for an aggregate', () => {
+    // The number is not quantifying a noun, so metadata cannot support it —
+    // an average still has to come from a query.
+    const report = validateClaims('The average order amount is 16.', [plain()], schema);
+    expect(report.unsupported.map((c) => c.text)).toContain('16');
+  });
+
+  it('does not let the row count vouch for an unrelated figure of the same value', () => {
+    const report = validateClaims('Revenue grew by 16%.', [plain()], schema);
+    expect(report.unsupported.map((c) => c.text)).toContain('16%');
+  });
+
+  it('still requires a query result for figures that are not metadata', () => {
+    const report = validateClaims('The average order amount is 161.08.', [], schema);
+    expect(report.unsupported.map((c) => c.text)).toContain('161.08');
+  });
+
+  it('prefers a result over metadata when both would support a figure', () => {
+    const r = result({ rows: [{ customer: 'Acme', total_revenue: 16 }], rowCount: 1 });
+    const report = validateClaims('Acme billed 16 orders worth of value.', [r], { tableName: 'orders_eval', rowCount: 16 });
+    expect(report.claims[0].supportedBy).toBe('result');
+  });
+
+  it('changes nothing when no schema metadata is supplied', () => {
+    expect(unsupportedTexts('There are 16 orders.', [plain()])).toContain('16');
   });
 });

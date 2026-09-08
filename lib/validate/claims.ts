@@ -9,8 +9,24 @@ export type Claim = {
   /** Surrounding prose, so the UI can show where the claim sits. */
   context: string;
   supported: boolean;
+  /** Which kind of evidence carried it, when it was supported. */
+  supportedBy?: 'result' | 'schema';
   severity?: ClaimSeverity;
   reason?: string;
+};
+
+/**
+ * Authoritative facts about the dataset itself, as the server stored them at
+ * ingest — never anything the model wrote.
+ *
+ * This exists because a claim like "all 16 orders" is about the table, not
+ * about any query, so no result set can ever support it. The row count is a
+ * fact the application already knows and can verify; treating it as evidence is
+ * different in kind from trusting a number because it appeared in prompt text.
+ */
+export type SchemaEvidence = {
+  tableName: string;
+  rowCount: number;
 };
 
 export type ValidationReport = {
@@ -36,12 +52,28 @@ export type ValidationReport = {
  * Detector 1 is a guarantee. Detector 2 is a smoke alarm: it reports the softer
  * `unverified_comparison` severity and will miss comparisons phrased without an
  * explicit measure.
+ *
+ * `schema` is optional authoritative metadata about the table. It can support
+ * only claims that are *about* the table — "16 orders", "16 rows" — and never a
+ * figure that merely happens to equal the row count. Aggregates still require a
+ * query result.
  */
-export function validateClaims(text: string, results: StoredResult[]): ValidationReport {
+export function validateClaims(
+  text: string,
+  results: StoredResult[],
+  schema: SchemaEvidence | null = null,
+): ValidationReport {
   const support = buildSupport(results);
-  const prose = stripNonProse(text);
+  const facts = metadataFacts(schema);
+  // Normalise before extraction: the model writes result ids with non-breaking
+  // hyphens and thousands separators with narrow no-break spaces, which would
+  // otherwise shatter into meaningless numeric fragments.
+  const prose = stripNonProse(normaliseUnicode(text));
 
-  const claims = [...findNumericClaims(prose, support), ...findComparisonClaims(prose, support)];
+  const claims = [
+    ...findNumericClaims(prose, support, facts),
+    ...findComparisonClaims(prose, support),
+  ];
 
   return {
     claims,
@@ -106,9 +138,34 @@ function buildSupport(results: StoredResult[]): Support {
   return { numbers, strings, columnWords, hasResults: results.length > 0 };
 }
 
+/** Hyphen-like characters models substitute for an ASCII hyphen. */
+const DASHES = /[‐‑‒–—―−]/g;
+/** Space-like characters, including the ones used as digit group separators. */
+const SPACES = /[      ⁠]/g;
+
 /**
- * Blanks out regions where digits are not quantitative claims, keeping the
- * original offsets so reported context still lines up with the answer.
+ * Folds Unicode punctuation the model uses into the ASCII forms the extractors
+ * expect. Observed in the Groq baseline: result ids written with U+2011
+ * non-breaking hyphens, so the UUID pattern missed them and their digit groups
+ * were reported as claims, and "1 195.75" written with a U+202F narrow
+ * no-break space, which parsed as two separate numbers.
+ *
+ * ASCII input is untouched: a plain space between digits stays ambiguous
+ * ("1 apple 195.75") and is deliberately not treated as a separator.
+ */
+export function normaliseUnicode(text: string): string {
+  return (
+    text
+      .replace(DASHES, '-')
+      // Only *between digits*, where it can only be a group separator.
+      .replace(new RegExp(`(?<=\\d)${SPACES.source}(?=\\d)`, 'g'), '')
+      .replace(SPACES, ' ')
+  );
+}
+
+/**
+ * Blanks out regions where digits are not quantitative claims, keeping offsets
+ * stable so reported context still lines up with the prose.
  */
 function stripNonProse(text: string): string {
   const blank = (match: string) => ' '.repeat(match.length);
@@ -116,18 +173,72 @@ function stripNonProse(text: string): string {
     .replace(/```[\s\S]*?```/g, blank) // fenced code: the model quotes its SQL
     .replace(/`[^`\n]*`/g, blank) // inline code
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, blank) // result_ids
+    // Dates are single values, not a 2026 plus an 01 plus an 04. Left whole they
+    // shatter into fragments that are claims about nothing.
+    .replace(/\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?/g, blank)
+    .replace(/\d{4}-\d{2}(?![-\d])/g, blank)
     .replace(/^[ \t]*\d+[.)][ \t]/gm, blank) // markdown list numbering
     .replace(/^[ \t]*\|[\s|:-]*\|[ \t]*$/gm, blank); // markdown table rules
 }
 
+/**
+ * One verifiable metadata fact: a value the server knows, plus the nouns a
+ * claim must be quantifying for that value to count as evidence.
+ */
+type MetadataFact = { value: number; nouns: Set<string>; label: string };
+
+function metadataFacts(schema: SchemaEvidence | null): MetadataFact[] {
+  if (!schema) return [];
+  // "16 orders" for a table called orders_eval, and the generic synonyms.
+  const nouns = new Set([
+    ...splitWords(schema.tableName),
+    'row',
+    'record',
+    'entry',
+    'order',
+  ]);
+  return [{ value: schema.rowCount, nouns, label: 'the stored row count for this table' }];
+}
+
+/**
+ * A metadata fact supports a number only when the number is directly
+ * quantifying a matching noun — "16 orders", "all 16 rows".
+ *
+ * This is the whole reason schema evidence is not a numeric whitelist. "The
+ * average order amount is 16" is not quantifying a noun, so the row count
+ * cannot vouch for it; that still needs a query result.
+ */
+function metadataSupportFor(
+  prose: string,
+  index: number,
+  rawLength: number,
+  value: number,
+  facts: MetadataFact[],
+): MetadataFact | null {
+  const following = prose.slice(index + rawLength, index + rawLength + 24).match(/^\s+([a-zA-Z]+)/);
+  if (!following) return null;
+
+  const word = following[1].toLowerCase();
+  const singular = word.replace(/s$/, '');
+
+  for (const fact of facts) {
+    if (!roughlyEqual(value, fact.value)) continue;
+    if (fact.nouns.has(word) || fact.nouns.has(singular)) return fact;
+  }
+  return null;
+}
+
 const NUMBER_PATTERN = /[$£€]?\s?\d[\d,]*(?:\.\d+)?\s?%?/g;
 
-function findNumericClaims(prose: string, support: Support): Claim[] {
+function findNumericClaims(prose: string, support: Support, facts: MetadataFact[]): Claim[] {
   const claims: Claim[] = [];
 
   for (const match of prose.matchAll(NUMBER_PATTERN)) {
     const raw = match[0].trim();
-    const index = match.index ?? 0;
+    // The pattern allows a leading space, so match.index can sit one character
+    // before the digits. Offsets into the prose must use the trimmed start, or
+    // the "16 orders" lookahead reads from the wrong place.
+    const index = (match.index ?? 0) + (match[0].length - match[0].trimStart().length);
 
     const isPercent = raw.includes('%');
     const digits = raw.replace(/[$£€,%\s]/g, '');
@@ -135,7 +246,14 @@ function findNumericClaims(prose: string, support: Support): Claim[] {
     if (!Number.isFinite(value)) continue;
 
     const decimals = digits.includes('.') ? digits.split('.')[1].length : 0;
-    const supported = support.hasResults && isNumberSupported(value, decimals, isPercent, digits, support);
+    const fromResult =
+      support.hasResults && isNumberSupported(value, decimals, isPercent, digits, support);
+    // Query results are checked first: a figure a query produced is better
+    // evidence than a fact about the table, and keeps `supportedBy` honest.
+    const fromSchema = fromResult
+      ? null
+      : metadataSupportFor(prose, index, raw.length, value, facts);
+    const supported = fromResult || fromSchema !== null;
 
     claims.push({
       kind: 'number',
@@ -143,7 +261,7 @@ function findNumericClaims(prose: string, support: Support): Claim[] {
       context: contextAround(prose, index, raw.length),
       supported,
       ...(supported
-        ? {}
+        ? { supportedBy: fromResult ? ('result' as const) : ('schema' as const) }
         : {
             severity: 'unsupported_number' as const,
             reason: support.hasResults

@@ -1,6 +1,7 @@
 import { getResult } from '@/lib/db/results';
 import type { StoredResult } from '@/lib/db/results';
-import { validateClaims } from '@/lib/validate/claims';
+import { getSourceWithSchema } from '@/lib/db/sources';
+import { validateClaims, type SchemaEvidence } from '@/lib/validate/claims';
 
 export const runtime = 'nodejs';
 
@@ -37,6 +38,14 @@ export async function POST(request: Request) {
     return Response.json({ error: 'resultIds must be strings' }, { status: 400 });
   }
 
+  // Loaded from Postgres by id, exactly like the result rows. The caller
+  // supplies the source id and nothing else: a row count sent in the body would
+  // be model-provided text, which is never evidence.
+  const source = await getSourceWithSchema(sourceId);
+  const schema: SchemaEvidence | null = source
+    ? { tableName: source.tableName, rowCount: source.rowCount }
+    : null;
+
   const results: StoredResult[] = [];
   const rejectedResultIds: string[] = [];
 
@@ -51,6 +60,6 @@ export async function POST(request: Request) {
     results.push(result);
   }
 
-  const report = validateClaims(text, results);
+  const report = validateClaims(text, results, schema);
   return Response.json({ ...report, rejectedResultIds });
 }

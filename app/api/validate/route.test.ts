@@ -147,4 +147,61 @@ describe('POST /api/validate', () => {
     expect(report.rejectedResultIds).toEqual(['00000000-0000-0000-0000-000000000000']);
     expect(report.unsupported.map((c: { text: string }) => c.text)).toContain('$395.00');
   });
+
+  it('supports a row count claim from the stored source metadata', async () => {
+    // The fixture source was created with profile.rowCount = 5.
+    const response = await post({
+      sourceId,
+      resultIds: [resultId],
+      text: 'There are 5 orders in the dataset.',
+    });
+    const report = await response.json();
+    expect(report.unsupported).toEqual([]);
+    expect(report.claims[0].supportedBy).toBe('schema');
+  });
+
+  it('rejects a row count that contradicts the stored metadata', async () => {
+    const response = await post({
+      sourceId,
+      resultIds: [resultId],
+      text: 'There are 17 orders in the dataset.',
+    });
+    const report = await response.json();
+    expect(report.unsupported.map((c: { text: string }) => c.text)).toContain('17');
+  });
+
+  it('ignores a row count supplied in the request body', async () => {
+    // The tamper case for metadata: the caller asserts its own schema. The
+    // route reads the source from Postgres and never looks at this.
+    const response = await post({
+      sourceId,
+      resultIds: [resultId],
+      text: 'There are 999 orders in the dataset.',
+      schema: { tableName: 'orders', rowCount: 999 },
+      rowCount: 999,
+    });
+    const report = await response.json();
+    expect(report.unsupported.map((c: { text: string }) => c.text)).toContain('999');
+  });
+
+  it('still requires a query result for an aggregate, not schema metadata', async () => {
+    const response = await post({
+      sourceId,
+      resultIds: [resultId],
+      text: 'The average order amount is 5.',
+    });
+    const report = await response.json();
+    expect(report.unsupported.map((c: { text: string }) => c.text)).toContain('5');
+  });
+
+  it('does not flag UUID digits written with non-breaking hyphens', async () => {
+    const nb = '‑';
+    const response = await post({
+      sourceId,
+      resultIds: [resultId],
+      text: `Globex leads with $395.00 (result b105e80d${nb}e11c${nb}4bb7${nb}8e7a${nb}74bd3e390862).`,
+    });
+    const report = await response.json();
+    expect(report.unsupported).toEqual([]);
+  });
 });
