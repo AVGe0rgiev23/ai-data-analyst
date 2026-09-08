@@ -104,6 +104,25 @@ For local development you can instead append `OPENROUTER_API_KEY=<key>` to
 `.env.local` directly. Note that `vercel env pull` **overwrites** `.env.local`,
 so prefer adding it to the Vercel project as above.
 
+### Temporarily switching to Groq
+
+While the OpenRouter free-tier daily allowance is exhausted, the app can run
+against Groq instead. This is a provider swap only — same agent, same prompt,
+same tools, same SQL guard, same validator.
+
+```bash
+# .env.local
+AI_PROVIDER=groq
+GROQ_API_KEY=<key from https://console.groq.com/keys>
+```
+
+Model: `openai/gpt-oss-120b` via Groq's OpenAI-compatible endpoint at
+`https://api.groq.com/openai/v1`. It does both tool calling and structured
+output, so Groq needs no equivalent of the two OpenRouter model chains.
+
+To switch back, remove `AI_PROVIDER` (or set it to `openrouter`). The OpenRouter
+configuration is left fully intact, and `OPENROUTER_API_KEY` is still required.
+
 ### Free-tier limits
 
 Free models are rate limited: roughly 20 requests per minute, and a daily cap

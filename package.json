@@ -17,6 +17,7 @@
     "eval": "dotenv -e .env.local -- tsx scripts/eval.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.44",
     "@ai-sdk/react": "^4.0.96",
     "@duckdb/node-api": "1.5.5-r.4",
     "@neondatabase/serverless": "^1.1.0",

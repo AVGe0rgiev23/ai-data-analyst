@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import {
   AGENT_MODEL_ID,
   AGENT_MODEL_FALLBACKS,
@@ -10,9 +10,19 @@ import {
 } from './model';
 
 const saved = process.env.OPENROUTER_API_KEY;
+const savedProvider = process.env.AI_PROVIDER;
+
+beforeEach(() => {
+  // These assertions describe the OpenRouter path, so they must not depend on
+  // whatever AI_PROVIDER happens to be set to in the environment.
+  delete process.env.AI_PROVIDER;
+});
+
 afterEach(() => {
   if (saved === undefined) delete process.env.OPENROUTER_API_KEY;
   else process.env.OPENROUTER_API_KEY = saved;
+  if (savedProvider === undefined) delete process.env.AI_PROVIDER;
+  else process.env.AI_PROVIDER = savedProvider;
   vi.unstubAllGlobals();
 });
 
@@ -79,9 +89,11 @@ describe('model selection', () => {
       }),
     );
 
-    await factory()
-      .doGenerate({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] })
-      .catch(() => undefined);
+    // Promise.resolve because the two providers' models differ in whether
+    // doGenerate returns a Promise or a PromiseLike.
+    await Promise.resolve(
+      factory().doGenerate({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }] }),
+    ).catch(() => undefined);
 
     expect(seenUrl).toContain('openrouter.ai');
     expect(seenAuth).toBe('Bearer sk-or-v1-test-key');

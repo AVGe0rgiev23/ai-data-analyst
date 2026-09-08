@@ -1,5 +1,7 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { requireEnv } from '@/lib/env';
+import { activeProvider } from './provider';
 
 /**
  * Model ids have exactly one home. Every id is a `:free` model, so the app
@@ -57,12 +59,35 @@ function build(primary: string, chain: readonly string[]) {
   return openrouter.chat(primary);
 }
 
+/**
+ * Temporary alternative provider, used while the OpenRouter free-tier daily
+ * quota is exhausted. Groq speaks the OpenAI chat-completions protocol, so the
+ * generic OpenAI-compatible client covers it without a bespoke package.
+ *
+ * One model serves both jobs here: gpt-oss-120b does tool calling and honours a
+ * JSON schema, so Groq needs no equivalent of the two OpenRouter chains. There
+ * is no `models` fallback array either — that parameter is OpenRouter's.
+ */
+export const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
+export const GROQ_MODEL_ID = 'openai/gpt-oss-120b';
+
+function buildGroq() {
+  const groq = createOpenAICompatible({
+    name: 'groq',
+    baseURL: GROQ_BASE_URL,
+    apiKey: requireEnv('GROQ_API_KEY'),
+  });
+  return groq.chatModel(GROQ_MODEL_ID);
+}
+
 /** The agent's model: optimised for tool-calling latency. */
 export function getModel() {
-  return build(AGENT_MODEL_ID, AGENT_MODEL_FALLBACKS);
+  return activeProvider() === 'groq' ? buildGroq() : build(AGENT_MODEL_ID, AGENT_MODEL_FALLBACKS);
 }
 
 /** For generateObject: restricted to models that honour a JSON schema. */
 export function getStructuredModel() {
-  return build(STRUCTURED_MODEL_ID, STRUCTURED_MODEL_FALLBACKS);
+  return activeProvider() === 'groq'
+    ? buildGroq()
+    : build(STRUCTURED_MODEL_ID, STRUCTURED_MODEL_FALLBACKS);
 }

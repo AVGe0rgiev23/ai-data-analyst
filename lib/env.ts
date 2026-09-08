@@ -1,7 +1,14 @@
 const REQUIRED = ['OPENROUTER_API_KEY', 'DATABASE_URL', 'BLOB_READ_WRITE_TOKEN'] as const;
 
-export type EnvKey = (typeof REQUIRED)[number];
-export type Env = Record<EnvKey, string>;
+/**
+ * Readable through requireEnv() but not demanded by getEnv(): which of these is
+ * needed depends on AI_PROVIDER, so requiring both providers' keys at once
+ * would make the app refuse to start with a perfectly valid configuration.
+ */
+type OptionalEnvKey = 'GROQ_API_KEY' | 'AI_PROVIDER';
+
+export type EnvKey = (typeof REQUIRED)[number] | OptionalEnvKey;
+export type Env = Record<(typeof REQUIRED)[number], string>;
 
 export function getEnv(): Env {
   const missing = REQUIRED.filter((key) => !process.env[key]);

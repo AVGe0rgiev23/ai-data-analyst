@@ -1,4 +1,5 @@
 import { APICallError, NoObjectGeneratedError, RetryError } from 'ai';
+import { activeProviderInfo } from './provider';
 
 export type AiErrorKind =
   | 'rate_limit'
@@ -23,6 +24,10 @@ export type FriendlyAiError = {
  * through here so the app explains the wait instead of failing opaquely.
  */
 export function toFriendlyAiError(cause: unknown): FriendlyAiError {
+  // Named from the active provider so a rate limit or rejected key points at
+  // the service actually in use, and at the right environment variable.
+  const { label, apiKeyName } = activeProviderInfo();
+
   // The SDK retries transient failures and then wraps the attempts, so the
   // useful status lives on the last inner error, not the wrapper.
   if (RetryError.isInstance(cause)) {
@@ -49,8 +54,8 @@ export function toFriendlyAiError(cause: unknown): FriendlyAiError {
         status: 429,
         retryAfterSeconds,
         message: retryAfterSeconds
-          ? `OpenRouter's free-tier rate limit was reached. Try again in about ${formatWait(retryAfterSeconds)}.`
-          : "OpenRouter's free-tier rate limit was reached. Free models allow a limited number of requests per minute and per day — wait a moment and try again.",
+          ? `${label}'s free-tier rate limit was reached. Try again in about ${formatWait(retryAfterSeconds)}.`
+          : `${label}'s free-tier rate limit was reached. Free models allow a limited number of requests per minute and per day — wait a moment and try again.`,
       };
     }
 
@@ -60,8 +65,7 @@ export function toFriendlyAiError(cause: unknown): FriendlyAiError {
         // A rejected key is a server-side misconfiguration, not something the
         // visitor did, so it must not surface as a 4xx blaming their request.
         status: 500,
-        message:
-          'OpenRouter rejected the API key. Check that OPENROUTER_API_KEY is set correctly on the server.',
+        message: `${label} rejected the API key. Check that ${apiKeyName} is set correctly on the server.`,
       };
     }
 
@@ -69,16 +73,14 @@ export function toFriendlyAiError(cause: unknown): FriendlyAiError {
       return {
         kind: 'quota',
         status: 402,
-        message:
-          'OpenRouter reported that this request needs paid credits. The app is configured for free models only — check that the configured model still ends in ":free".',
+        message: `${label} reported that this request needs paid credits. The app is configured for free models only.`,
       };
     }
 
     return {
       kind: 'unavailable',
       status: 503,
-      message:
-        'OpenRouter could not be reached or returned an error. This is usually temporary — try again shortly.',
+      message: `${label} could not be reached or returned an error. This is usually temporary — try again shortly.`,
     };
   }
 
