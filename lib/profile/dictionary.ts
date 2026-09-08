@@ -1,7 +1,7 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import type { SourceWithSchema } from '@/lib/db/sources';
-import { getModel } from '@/lib/ai/model';
+import { getStructuredModel } from '@/lib/ai/model';
 
 export function buildDictionaryPrompt(source: SourceWithSchema): string {
   const pending = source.columns.filter((c) => c.descriptionSource !== 'user');
@@ -18,7 +18,9 @@ export function buildDictionaryPrompt(source: SourceWithSchema): string {
     'Sample rows:',
     JSON.stringify(source.sampleRows.slice(0, 5), null, 2),
     '',
-    'Write one plain-English sentence per column describing what it holds and how an analyst would use it.',
+    // Length-capped on purpose: on free models output tokens dominate latency,
+    // and a 20-word description is also easier to scan in the profile card.
+    'Write one plain-English sentence per column, at most 20 words, describing what it holds and how an analyst would use it.',
     'Base the description only on the name, type, statistics, and samples above. If a column is genuinely ambiguous, say so rather than inventing meaning.',
   ].join('\n');
 }
@@ -31,7 +33,7 @@ export async function draftDictionary(
   source: SourceWithSchema,
 ): Promise<{ name: string; description: string }[]> {
   const { object } = await generateObject({
-    model: getModel(),
+    model: getStructuredModel(),
     schema: dictionarySchema,
     prompt: buildDictionaryPrompt(source),
   });
