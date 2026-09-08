@@ -86,8 +86,11 @@ export function ProfileCard({
     setError(null);
     try {
       const response = await fetch(`/api/sources/${source.id}/dictionary`, { method: 'POST' });
-      if (!response.ok) throw new Error('Could not draft descriptions');
-      onSourceUpdated?.(await response.json());
+      const json = await response.json().catch(() => null);
+      // The server explains rate limits and outages precisely; showing a generic
+      // failure instead would hide the one thing the user can act on.
+      if (!response.ok) throw new Error(json?.error ?? 'Could not draft descriptions');
+      onSourceUpdated?.(json);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not draft descriptions');
     } finally {

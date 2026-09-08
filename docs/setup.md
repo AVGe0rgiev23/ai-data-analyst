@@ -2,7 +2,7 @@
 
 This document records the exact commands used to link this repository to a
 Vercel project and provision its backing services (Postgres via Neon, file
-storage via Vercel Blob, and an AI Gateway API key), so the project can be
+storage via Vercel Blob, and an OpenRouter API key), so the project can be
 re-provisioned from scratch if needed.
 
 Prerequisites: Vercel CLI installed (`pnpm dlx vercel@latest` or a global
@@ -80,31 +80,39 @@ vercel blob create-store ai-data-analyst-blob --access private --yes
 This creates the store, connects it to the currently-linked project, and
 injects `BLOB_READ_WRITE_TOKEN` into the project's environment variables.
 
-## 5. Provision an AI Gateway API key
+## 5. Provision an OpenRouter API key
 
-The AI Gateway defaults to OIDC-based auth (`VERCEL_OIDC_TOKEN`, auto-pulled
-by `vercel env pull`), but this project's `lib/env.ts` requires a static
-`AI_GATEWAY_API_KEY`. Create one explicitly, with a small budget cap so the
-key cannot spend beyond a bounded amount:
+This project deliberately does **not** use Vercel AI Gateway: the Gateway
+refuses every request with `403 customer_verification_required` until a credit
+card is on file for the team, even to spend its free allotment. OpenRouter's
+free models need no card and no credits.
+
+1. Create an account at <https://openrouter.ai> (no payment method required).
+2. Create a key at <https://openrouter.ai/settings/keys>.
+3. Leave the key's credit limit at 0 — free models cost nothing, and a 0 limit
+   makes it impossible for the app to spend money by accident.
+
+Then add it to the project's environment variables:
 
 ```bash
-vercel ai-gateway api-keys create --name ai-data-analyst-local --budget 1 --refresh-period monthly
+vercel env add OPENROUTER_API_KEY production --value "<key-value>" --yes
+vercel env add OPENROUTER_API_KEY preview --value "<key-value>" --yes
+vercel env add OPENROUTER_API_KEY development --value "<key-value>" --yes
 ```
 
-This prints the key value once — copy it. Then add it to the project's
-environment variables for each environment (the `create` command does not do
-this automatically):
+For local development you can instead append `OPENROUTER_API_KEY=<key>` to
+`.env.local` directly. Note that `vercel env pull` **overwrites** `.env.local`,
+so prefer adding it to the Vercel project as above.
 
-```bash
-vercel env add AI_GATEWAY_API_KEY production --value "<key-value>" --yes
-vercel env add AI_GATEWAY_API_KEY preview --value "<key-value>" --yes
-vercel env add AI_GATEWAY_API_KEY development --value "<key-value>" --yes
-```
+### Free-tier limits
 
-Note: every Vercel team also gets a monthly allotment of free AI Gateway
-credits, so normal development traffic through this key should stay within
-the free tier; the `--budget 1` cap is an extra safety net, not a
-requirement.
+Free models are rate limited: roughly 20 requests per minute, and a daily cap
+that is much lower for accounts that have never bought credits than for those
+that have. The app treats a 429 as a normal condition — `lib/ai/errors.ts` maps
+it to a message telling the user how long to wait, rather than failing opaquely.
+The configured model is `openrouter/free` (see `lib/ai/model.ts`), OpenRouter's
+free router, which spreads load across whichever free models are currently
+available and support the request's tool-calling and structured-output needs.
 
 ## 6. Pull environment variables locally
 
@@ -114,12 +122,13 @@ vercel env pull .env.local --yes
 
 This writes `.env.local` (git-ignored) with all environment variables
 configured for the `development` environment: `DATABASE_URL`,
-`BLOB_READ_WRITE_TOKEN`, `AI_GATEWAY_API_KEY`, and `VERCEL_OIDC_TOKEN`.
+`BLOB_READ_WRITE_TOKEN` and `VERCEL_OIDC_TOKEN` (plus `OPENROUTER_API_KEY`
+once it is added to the project).
 
 ## 7. Verify every required variable is present
 
 `lib/env.ts`'s `getEnv()` requires exactly three variables:
-`AI_GATEWAY_API_KEY`, `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`.
+`OPENROUTER_API_KEY`, `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`.
 
 Because this project uses `"type": "module"` in `package.json`, a plain
 `node -e "require('dotenv')..."` one-liner fails (`require` is not defined
@@ -131,7 +140,7 @@ pnpm add -D dotenv
 node --input-type=module -e "
 import { config } from 'dotenv';
 config({ path: '.env.local' });
-['AI_GATEWAY_API_KEY','DATABASE_URL','BLOB_READ_WRITE_TOKEN'].forEach(k=>{
+['OPENROUTER_API_KEY','DATABASE_URL','BLOB_READ_WRITE_TOKEN'].forEach(k=>{
   if(!process.env[k]){ console.log(k, 'MISSING'); } else { console.log(k, 'ok'); }
 });
 "
@@ -143,17 +152,17 @@ Expected: three `ok` lines. (Equivalently, `pnpm dlx dotenv-cli -e .env.local --
 
 | Variable | Purpose | Provisioned by |
 |---|---|---|
-| `AI_GATEWAY_API_KEY` | Static API key for Vercel AI Gateway — authenticates model calls (OpenAI, Anthropic, etc.) routed through `https://ai-gateway.vercel.sh` without per-provider keys. | `vercel ai-gateway api-keys create`, then `vercel env add` (manual step: copy printed key into the `env add` commands) |
+| `OPENROUTER_API_KEY` | API key for OpenRouter — authenticates model calls routed through `https://openrouter.ai/api/v1`. Used only server-side. Free models require no credits. | Created by hand at <https://openrouter.ai/settings/keys>, then `vercel env add` |
 | `DATABASE_URL` | Postgres connection string for the Neon serverless database, used by `@neondatabase/serverless` / Drizzle ORM for all relational data. | `vercel integration add neon` (manual step: accept Neon marketplace terms in a browser, see Step 3) |
 | `BLOB_READ_WRITE_TOKEN` | Read/write token for the project's Vercel Blob store, used by `@vercel/blob` for uploaded file storage. | `vercel blob create-store` |
-| `VERCEL_OIDC_TOKEN` | Auto-provisioned short-lived (~24h) OIDC JWT used internally by Vercel tooling (e.g. AI Gateway OIDC fallback). Not required by `getEnv()`; refresh by re-running `vercel env pull`. | `vercel link` / `vercel env pull` (automatic) |
+| `VERCEL_OIDC_TOKEN` | Auto-provisioned short-lived (~24h) OIDC JWT used internally by Vercel tooling. Not required by `getEnv()`; refresh by re-running `vercel env pull`. | `vercel link` / `vercel env pull` (automatic) |
 
 ## Re-provisioning from scratch
 
 1. `vercel link --yes --project ai-data-analyst`
 2. `vercel integration add neon` (accept marketplace terms in a browser first if prompted — see Step 3)
 3. `vercel blob create-store ai-data-analyst-blob --access private --yes`
-4. `vercel ai-gateway api-keys create --name ai-data-analyst-local --budget 1 --refresh-period monthly`, then `vercel env add AI_GATEWAY_API_KEY <production|preview|development> --value "<key>" --yes` for each environment
+4. Create an OpenRouter key at <https://openrouter.ai/settings/keys>, then `vercel env add OPENROUTER_API_KEY <production|preview|development> --value "<key>" --yes` for each environment
 5. `vercel env pull .env.local --yes`
 6. `pnpm add -D dotenv` (if not already installed) and run the verification snippet in Step 7 above
 

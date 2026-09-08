@@ -1,7 +1,7 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import type { SourceWithSchema } from '@/lib/db/sources';
-import { MODEL } from '@/lib/ai/model';
+import { getModel } from '@/lib/ai/model';
 
 export function buildDictionaryPrompt(source: SourceWithSchema): string {
   const pending = source.columns.filter((c) => c.descriptionSource !== 'user');
@@ -31,7 +31,7 @@ export async function draftDictionary(
   source: SourceWithSchema,
 ): Promise<{ name: string; description: string }[]> {
   const { object } = await generateObject({
-    model: MODEL,
+    model: getModel(),
     schema: dictionarySchema,
     prompt: buildDictionaryPrompt(source),
   });

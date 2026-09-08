@@ -61,4 +61,25 @@ describe('ProfileCard', () => {
     // The saved text is now the user's, so the AI marker is gone.
     await waitFor(() => expect(screen.queryByText('drafted by AI')).toBeNull());
   });
+
+  it('shows the rate-limit explanation the server sends instead of a generic failure', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({
+        error: "OpenRouter's free-tier rate limit was reached. Try again in about 30 seconds.",
+        kind: 'rate_limit',
+        retryAfterSeconds: 30,
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<ProfileCard source={source} onSourceUpdated={() => {}} />);
+    fireEvent.click(screen.getByText('Describe columns'));
+
+    await waitFor(() =>
+      expect(screen.getByText(/free-tier rate limit was reached/i)).toBeDefined(),
+    );
+    expect(screen.getByText(/about 30 seconds/i)).toBeDefined();
+  });
 });
