@@ -14,7 +14,7 @@
  *   agent   — the question through POST /api/chat, then the answer through the
  *             validator. Needs a model, so it is opt-in.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { QUESTIONS, CLAIM_CASES } from '@/lib/eval/questions';
 import { rowsMatch, figuresPresent, flagsMatch } from '@/lib/eval/score';
@@ -77,6 +77,8 @@ async function askAgent(sourceId: string, question: string) {
   const body = await response.text();
   let text = '';
   const resultIds: string[] = [];
+  const toolCalls: { tool: string; input: unknown }[] = [];
+  const toolOutputs: unknown[] = [];
   let streamError: string | null = null;
 
   for (const line of body.split('\n')) {
@@ -89,7 +91,11 @@ async function askAgent(sourceId: string, question: string) {
     }
     if (event.type === 'text-delta') text += String(event.delta ?? '');
     if (event.type === 'error') streamError = String(event.errorText ?? 'stream error');
+    if (event.type === 'tool-input-available') {
+      toolCalls.push({ tool: String(event.toolName ?? ''), input: event.input });
+    }
     if (event.type === 'tool-output-available') {
+      toolOutputs.push(event.output);
       const output = event.output as { result_id?: string } | undefined;
       if (output?.result_id && !resultIds.includes(output.result_id)) {
         resultIds.push(output.result_id);
@@ -98,7 +104,7 @@ async function askAgent(sourceId: string, question: string) {
   }
 
   if (streamError) throw new Error(streamError);
-  return { text, resultIds };
+  return { text, resultIds, toolCalls, toolOutputs };
 }
 
 async function main() {
@@ -107,6 +113,8 @@ async function main() {
   console.log(`Uploaded eval fixture as source ${sourceId}\n`);
 
   const outcomes: Outcome[] = [];
+  // Diagnostics only. Nothing here participates in scoring.
+  const diagnostics: Record<string, unknown>[] = [];
 
   // Layer 1: the engine against hand-computed answers.
   for (const question of QUESTIONS) {
@@ -144,8 +152,13 @@ async function main() {
   // Layer 3: the agent itself. Opt-in, because it costs model calls.
   if (runAgent) {
     for (const question of QUESTIONS) {
+      const started = Date.now();
       try {
-        const { text, resultIds } = await askAgent(sourceId, question.question);
+        const { text, resultIds, toolCalls, toolOutputs } = await askAgent(
+          sourceId,
+          question.question,
+        );
+        const latencyMs = Date.now() - started;
         const stated = figuresPresent(text, question.expectedFigures);
         const report = await validate(sourceId, resultIds, text);
         const unsupportedNumbers = report.unsupported.filter(
@@ -163,15 +176,38 @@ async function main() {
           .join('; ');
 
         outcomes.push({ id: question.id, layer: 'agent', ok, detail: detail || undefined });
-      } catch (cause) {
-        outcomes.push({
+        diagnostics.push({
           id: question.id,
-          layer: 'agent',
+          question: question.question,
+          expectedRows: question.expectedRows,
+          expectedFigures: question.expectedFigures,
+          notes: question.notes,
+          answer: text,
+          toolCalls,
+          toolOutputs,
+          unsupported: report.unsupported,
+          latencyMs,
+          ok,
+          detail: detail || undefined,
+        });
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        outcomes.push({ id: question.id, layer: 'agent', ok: false, detail: message });
+        diagnostics.push({
+          id: question.id,
+          question: question.question,
+          expectedRows: question.expectedRows,
+          expectedFigures: question.expectedFigures,
+          notes: question.notes,
+          error: message,
+          latencyMs: Date.now() - started,
           ok: false,
-          detail: cause instanceof Error ? cause.message : String(cause),
         });
       }
     }
+
+    writeFileSync('eval-agent-diagnostics.json', JSON.stringify(diagnostics, null, 2));
+    console.log('Wrote eval-agent-diagnostics.json');
   }
 
   report(outcomes);

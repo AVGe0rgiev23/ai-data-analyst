@@ -43,3 +43,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Evaluation run artifact
+eval-agent-diagnostics.json
