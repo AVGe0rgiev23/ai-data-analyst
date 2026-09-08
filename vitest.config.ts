@@ -8,5 +8,5 @@ export default defineConfig({
     environment: 'node',
     setupFiles: [],
   },
-  resolve: { alias: { '@': resolve(__dirname, '.') } },
+  resolve: { alias: { '@': resolve(import.meta.dirname, '.') } },
 });
