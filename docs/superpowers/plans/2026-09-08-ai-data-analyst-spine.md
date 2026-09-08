@@ -20,9 +20,9 @@ Last updated 2026-09-08.
 | 1 — Data in | 4, 5, 6, 7, 8, 9, 10 | Done |
 | 2 — SQL engine | 11, 12, 13, 14 | Done |
 | 3 — Agent | 15, 16, 17 | Done — verified against real data on OpenRouter free models |
-| 4 — Charts | 18, 19, 20, 21 | Not started |
+| 4 — Charts | 18, 19, 20, 21 | Done — deployed and verified on Vercel |
 
-`pnpm test` is green (99 tests), `tsc --noEmit` and `pnpm lint` clean, `pnpm build` succeeds.
+`pnpm test` is green (120 tests), `tsc --noEmit` and `pnpm lint` clean, `pnpm build` succeeds.
 
 Divergences applied while implementing, each recorded in its commit message:
 
@@ -48,6 +48,21 @@ Divergences applied while implementing, each recorded in its commit message:
 - Task 16 — the plan's expected answer ("Acme at 360.75") is wrong; Globex at 395.00 is correct.
 - Task 17 — three prompt rules added after a real run showed the agent totalling `sample_rows`
   itself rather than querying. Phase 8's numeric-claim validator remains the durable fix.
+- Task 21 — `extractStreamUpdates` extracted as a pure function and callbacks guarded with refs.
+  `useChat` returns a fresh `messages` array each render, so emitting unconditionally caused
+  "Maximum update depth exceeded".
+- Task 21 — Phase 0's "DuckDB proven on Vercel" did not hold. The deployed function died with
+  `libduckdb.so: cannot open shared object file`, and the tracing glob pointed at a path that does
+  not exist under pnpm, failing the build with ENOENT. Both fixed in `next.config.ts`; the smoke
+  route now returns v1.5.5 from the deployed function.
+
+## Known accuracy gap (for Phase 8)
+
+The agent still states claims that no tool result contains. Observed on a real run: asked to chart
+revenue by customer, it queried customer totals correctly, then wrote that Globex "is the smallest
+customer by order count". Order counts were never queried, and the claim is false — Globex has two
+orders, Initech has one. Prompt rules reduced this but do not eliminate it on free models. The
+numeric-claim validator in Phase 8 is what makes the accuracy claim defensible.
 
 ## Global Constraints
 
