@@ -24,13 +24,10 @@ export default function Page() {
       return;
     }
     setSource(await response.json());
-
-    // Fire and forget: descriptions sharpen the agent's schema context, but a
-    // rate-limited draft must never block getting to the data.
-    void fetch(`/api/sources/${sourceId}/dictionary`, { method: 'POST' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((updated) => updated && setSource(updated))
-      .catch(() => undefined);
+    // Drafting the dictionary is left to the "Describe columns" button rather
+    // than firing on every upload. Free-tier quota is a small daily allowance,
+    // and spending one before the user has asked anything is a poor trade —
+    // the profile alone already tells the agent every column, type and range.
   }, []);
 
   const handleResultId = useCallback((id: string) => {
