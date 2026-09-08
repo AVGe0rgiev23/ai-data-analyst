@@ -36,4 +36,23 @@ describe('buildSystemPrompt', () => {
   it('warns about truncated results', () => {
     expect(buildSystemPrompt(source)).toMatch(/truncated/i);
   });
+
+  it('forbids doing arithmetic in its own head', () => {
+    // Observed failure: given a LIMIT 1 result plus get_schema sample rows, the
+    // agent summed the other customers itself and presented a breakdown table.
+    // The figures were right on a 5-row fixture; on real data that is exactly
+    // how a plausible wrong number gets stated.
+    const prompt = buildSystemPrompt(source);
+    expect(prompt).toMatch(/do not (calculate|compute).*yourself/i);
+  });
+
+  it('rules sample rows out as a source of figures', () => {
+    const prompt = buildSystemPrompt(source);
+    expect(prompt).toMatch(/sample_rows/);
+    expect(prompt).toMatch(/orientation/i);
+  });
+
+  it('warns that a LIMIT means unseen rows', () => {
+    expect(buildSystemPrompt(source)).toMatch(/LIMIT/);
+  });
 });

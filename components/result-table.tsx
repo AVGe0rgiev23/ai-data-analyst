@@ -4,7 +4,9 @@ export function ResultTable({ result }: { result: StoredResult }) {
   return (
     <div>
       <div className="flex items-center gap-3 pb-2 text-xs text-neutral-500">
-        <span>{result.rowCount.toLocaleString()} rows</span>
+        <span>
+          {result.rowCount.toLocaleString()} {result.rowCount === 1 ? 'row' : 'rows'}
+        </span>
         <span>{result.durationMs} ms</span>
       </div>
       {result.truncated && (
