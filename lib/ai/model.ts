@@ -71,11 +71,40 @@ function build(primary: string, chain: readonly string[]) {
 export const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 export const GROQ_MODEL_ID = 'openai/gpt-oss-120b';
 
+/**
+ * gpt-oss is a reasoning model: Groq returns `reasoning_content` on the
+ * assistant message, then rejects that same property when it is sent back on
+ * the next turn:
+ *
+ *   'messages.2' : for 'role:assistant' the following must be satisfied
+ *   [('messages.2' : property 'reasoning_content' is unsupported)]
+ *
+ * That breaks the *second* leg of every tool loop — the model calls run_sql
+ * fine, and the follow-up request carrying the tool result fails — so the agent
+ * never gets to write its answer. Dropping the field on the way out is the
+ * whole fix; nothing about the conversation the model sees changes.
+ */
+export function stripUnsupportedReasoning(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!Array.isArray(body.messages)) return body;
+  return {
+    ...body,
+    messages: body.messages.map((message) => {
+      if (!message || typeof message !== 'object') return message;
+      const copy = { ...(message as Record<string, unknown>) };
+      delete copy.reasoning_content;
+      return copy;
+    }),
+  };
+}
+
 function buildGroq() {
   const groq = createOpenAICompatible({
     name: 'groq',
     baseURL: GROQ_BASE_URL,
     apiKey: requireEnv('GROQ_API_KEY'),
+    transformRequestBody: stripUnsupportedReasoning,
   });
   return groq.chatModel(GROQ_MODEL_ID);
 }

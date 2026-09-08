@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { APICallError, NoObjectGeneratedError, RetryError } from 'ai';
 import { toFriendlyAiError } from './errors';
 
@@ -11,6 +11,17 @@ function apiError(statusCode: number, responseHeaders: Record<string, string> = 
     responseHeaders,
   });
 }
+
+// These assertions describe the default provider, so they must not depend on
+// whatever AI_PROVIDER happens to be set to in the environment.
+const savedProvider = process.env.AI_PROVIDER;
+beforeEach(() => {
+  delete process.env.AI_PROVIDER;
+});
+afterEach(() => {
+  if (savedProvider === undefined) delete process.env.AI_PROVIDER;
+  else process.env.AI_PROVIDER = savedProvider;
+});
 
 describe('toFriendlyAiError', () => {
   it('explains a free-tier rate limit and keeps the 429 status', () => {

@@ -1,6 +1,12 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { activeProvider, activeProviderInfo, DEFAULT_PROVIDER } from './provider';
-import { getModel, getStructuredModel, GROQ_MODEL_ID, GROQ_BASE_URL } from './model';
+import {
+  getModel,
+  getStructuredModel,
+  GROQ_MODEL_ID,
+  GROQ_BASE_URL,
+  stripUnsupportedReasoning,
+} from './model';
 import { toFriendlyAiError } from './errors';
 import { APICallError } from 'ai';
 
@@ -169,5 +175,36 @@ describe('error reporting follows the active provider', () => {
 
   it('still names OpenRouter by default', () => {
     expect(toFriendlyAiError(rateLimited()).message).toMatch(/OpenRouter/);
+  });
+});
+
+describe('stripUnsupportedReasoning', () => {
+  // Groq emits reasoning_content and then refuses to accept it back, which
+  // broke the second leg of the tool loop.
+  it('removes reasoning_content from assistant messages', () => {
+    const body = stripUnsupportedReasoning({
+      model: 'openai/gpt-oss-120b',
+      messages: [
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: '', reasoning_content: 'thinking...', tool_calls: [{ id: 't1' }] },
+      ],
+    });
+    const messages = body.messages as Record<string, unknown>[];
+    expect('reasoning_content' in messages[1]).toBe(false);
+  });
+
+  it('leaves everything else on the message untouched', () => {
+    const body = stripUnsupportedReasoning({
+      messages: [{ role: 'assistant', content: 'answer', reasoning_content: 'x', tool_calls: [{ id: 't1' }] }],
+    });
+    const message = (body.messages as Record<string, unknown>[])[0];
+    expect(message.role).toBe('assistant');
+    expect(message.content).toBe('answer');
+    expect(message.tool_calls).toEqual([{ id: 't1' }]);
+  });
+
+  it('passes a body with no messages through unchanged', () => {
+    const body = { model: 'x' };
+    expect(stripUnsupportedReasoning(body)).toEqual(body);
   });
 });
