@@ -29,7 +29,7 @@ export default function Home() {
       <div className="mt-8 space-y-6">
         {source ? (
           <>
-            <ProfileCard source={source} />
+            <ProfileCard source={source} onSourceUpdated={setSource} />
             <button
               type="button"
               className="text-sm text-neutral-500 underline underline-offset-4"

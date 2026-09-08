@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProfileCard } from './profile-card';
 
 const source = {
@@ -16,6 +16,8 @@ const source = {
   ],
 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe('ProfileCard', () => {
   it('shows the row count, column type, and null percentage', () => {
     render(<ProfileCard source={source} />);
@@ -23,5 +25,40 @@ describe('ProfileCard', () => {
     expect(screen.getByText('DOUBLE')).toBeDefined();
     expect(screen.getByText('12.5% null')).toBeDefined();
     expect(screen.getByText('Order total')).toBeDefined();
+  });
+
+  it('marks AI-drafted descriptions as unreviewed', () => {
+    render(<ProfileCard source={source} />);
+    expect(screen.getByText('drafted by AI')).toBeDefined();
+  });
+
+  it('does not mark a user-written description as AI-drafted', () => {
+    const edited = {
+      ...source,
+      columns: [{ ...source.columns[0], descriptionSource: 'user' as const }],
+    };
+    render(<ProfileCard source={edited} />);
+    expect(screen.queryByText('drafted by AI')).toBeNull();
+  });
+
+  it('saves an edited description as a user description', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<ProfileCard source={source} />);
+    fireEvent.click(screen.getByText('Order total'));
+
+    const input = screen.getByLabelText('Description for amount');
+    fireEvent.change(input, { target: { value: 'Gross order value in USD' } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/columns/c1');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body)).toEqual({ description: 'Gross order value in USD' });
+
+    // The saved text is now the user's, so the AI marker is gone.
+    await waitFor(() => expect(screen.queryByText('drafted by AI')).toBeNull());
   });
 });
