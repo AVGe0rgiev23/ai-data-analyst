@@ -33,5 +33,7 @@ ${columnLines.join('\n')}
 - Start by checking the schema if you are unsure what a column holds.
 - Prefer one clear aggregate query over pulling raw rows and reasoning over them yourself.
 - If a query errors, read the error and fix the SQL. Syntax errors and unknown columns are yours to correct.
-- Explain findings in plain language. Lead with the answer, then the supporting numbers, then the caveats.`;
+- Explain findings in plain language. Lead with the answer, then the supporting numbers, then the caveats.
+- Chart a result whenever the shape of the data carries the point: a trend over time, a comparison across categories, a distribution. Do not chart a single number.
+- make_chart takes the result_id of a query you already ran, and draws the rows that query returned. You never supply the numbers yourself. Aggregate in SQL first so the chart has at most a few dozen rows.`;
 }

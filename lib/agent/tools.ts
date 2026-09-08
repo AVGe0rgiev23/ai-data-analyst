@@ -4,6 +4,8 @@ import type { SourceWithSchema } from '@/lib/db/sources';
 import type { StoredResult } from '@/lib/db/results';
 import { runAgainstSource } from '@/lib/sql/run-against-source';
 import { SqlExecutionError } from '@/lib/sql/execute';
+import { chartSpecSchema, validateChartSpec, type ChartSpec } from '@/lib/charts/spec';
+import { getResult } from '@/lib/db/results';
 
 export type SqlToolResult = {
   result_id: string;
@@ -39,6 +41,24 @@ export function formatSqlToolResult(result: StoredResult): SqlToolResult {
 export function formatSqlToolError(cause: unknown): SqlToolError {
   if (cause instanceof SqlExecutionError) return { error: cause.message, kind: cause.kind };
   return { error: cause instanceof Error ? cause.message : 'Query failed', kind: 'runtime' };
+}
+
+export type ChartToolOutput =
+  | { spec: ChartSpec; result_id: string }
+  | { error: string; errors: string[] };
+
+export function buildChartToolResult(
+  result: { id: string; columns: { name: string; type: string }[] },
+  spec: ChartSpec,
+): ChartToolOutput {
+  const validation = validateChartSpec(spec, result.columns);
+  if (!validation.ok) {
+    return {
+      error: 'The chart spec does not match the result set.',
+      errors: validation.errors,
+    };
+  }
+  return { spec: validation.spec, result_id: result.id };
 }
 
 export function createTools(sourceId: string, source: SourceWithSchema) {
@@ -78,6 +98,25 @@ export function createTools(sourceId: string, source: SourceWithSchema) {
         } catch (cause) {
           return formatSqlToolError(cause);
         }
+      },
+    }),
+
+    make_chart: tool({
+      description:
+        'Render a chart from a result set you already produced with run_sql. Every column you reference must exist in that result set, and y columns must be numeric.',
+      inputSchema: z.object({
+        result_id: z.string().describe('The result_id returned by a previous run_sql call.'),
+        spec: chartSpecSchema,
+      }),
+      // The spec names columns; the rows are loaded from the stored result set,
+      // never taken from the model. A chart therefore cannot show a number the
+      // SQL engine did not return.
+      execute: async ({ result_id, spec }) => {
+        const result = await getResult(result_id);
+        if (!result) {
+          return { error: `Unknown result_id ${result_id}. Run the query first.`, errors: [] };
+        }
+        return buildChartToolResult(result, spec);
       },
     }),
 

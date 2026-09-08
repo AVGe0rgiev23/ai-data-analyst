@@ -55,4 +55,12 @@ describe('buildSystemPrompt', () => {
   it('warns that a LIMIT means unseen rows', () => {
     expect(buildSystemPrompt(source)).toMatch(/LIMIT/);
   });
+
+  it('explains when to chart', () => {
+    expect(buildSystemPrompt(source)).toMatch(/make_chart/);
+  });
+
+  it('binds charts to a queried result rather than model-supplied numbers', () => {
+    expect(buildSystemPrompt(source)).toMatch(/result_id of a query you already ran/i);
+  });
 });
