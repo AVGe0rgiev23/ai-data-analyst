@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, type ReactNode } from 'react';
-import { ArrowRight, CircleAlert, Columns3, Database, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CalendarOff, CircleAlert, Columns3, Copy, Database, ShieldCheck } from 'lucide-react';
 import type { SourceWithSchema } from '@/lib/db/sources';
 import { cn } from '@/lib/ui/cn';
 import { formatCell, formatCount, formatPercent, isNumericType, isTemporalType } from '@/lib/ui/format';
@@ -81,8 +81,16 @@ export function DatasetOverview({
         : 100 -
           columns.reduce((total, column) => total + column.nullPercentage, 0) / columns.length;
 
-    return { numeric, temporal, text, withGaps, completeness };
+    const dateWarnings = columns.filter((column) => column.dateWarning !== null);
+
+    return { numeric, temporal, text, withGaps, completeness, dateWarnings };
   }, [source.columns]);
+
+  // null means the source predates duplicate measurement — not the same claim
+  // as zero, so it is reported as unmeasured rather than as "no duplicates".
+  const duplicates = source.duplicateRows;
+  const duplicatePercent =
+    duplicates !== null && source.rowCount > 0 ? (duplicates / source.rowCount) * 100 : null;
 
   const sample = source.sampleRows.slice(0, 5);
   const sampleColumns = source.columns.slice(0, 8);
@@ -109,7 +117,7 @@ export function DatasetOverview({
             </Button>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-5">
             <Stat
               label="Rows"
               value={formatCount(source.rowCount)}
@@ -133,6 +141,19 @@ export function DatasetOverview({
               detail="Mean share of populated cells per column"
               icon={<ShieldCheck size={13} strokeWidth={2} />}
               tone={stats.completeness >= 99 ? 'positive' : 'neutral'}
+            />
+            <Stat
+              label="Duplicate rows"
+              value={duplicates === null ? '—' : formatCount(duplicates)}
+              detail={
+                duplicates === null
+                  ? 'Not measured for this dataset'
+                  : duplicates === 0
+                    ? 'Every row is distinct'
+                    : `${formatPercent(duplicatePercent ?? 0, 2)} of rows repeat an earlier row exactly`
+              }
+              icon={<Copy size={13} strokeWidth={2} />}
+              tone={duplicates === 0 ? 'positive' : duplicates === null ? 'neutral' : 'caution'}
             />
             <Stat
               label="Columns with gaps"
@@ -273,6 +294,22 @@ export function DatasetOverview({
             </div>
           </div>
         </div>
+
+        {stats.dateWarnings.length > 0 && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-caution/35 bg-caution-soft px-3 py-2">
+            <CalendarOff size={13} strokeWidth={2} className="mt-px shrink-0 text-caution" />
+            <p className="text-[11.5px] leading-relaxed text-ink-secondary">
+              <span className="font-medium text-ink">
+                {stats.dateWarnings.length === 1
+                  ? '1 column looks date-like but was kept as text'
+                  : `${stats.dateWarnings.length} columns look date-like but were kept as text`}
+              </span>{' '}
+              —{' '}
+              {stats.dateWarnings.map((column) => column.name).join(', ')}. The values were left
+              exactly as uploaded; date-based analysis may need them normalised first.
+            </p>
+          </div>
+        )}
 
         <p className="mt-3 flex items-center gap-1.5 text-[11.5px] text-ink-faint">
           <Badge tone="accent">grounded</Badge>

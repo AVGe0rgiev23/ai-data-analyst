@@ -26,6 +26,12 @@ export type SourceWithSchema = {
   tableName: string;
   parquetUrl: string;
   rowCount: number;
+  /**
+   * Rows beyond the first occurrence of each distinct row, or null for a
+   * source profiled before duplicates were measured. Null means "not
+   * measured", which is not the same claim as zero.
+   */
+  duplicateRows: number | null;
   sampleRows: Record<string, unknown>[];
   columns: StoredColumn[];
 };
@@ -39,6 +45,7 @@ export async function createSource(input: NewSource): Promise<string> {
       tableName: input.tableName,
       parquetUrl: input.parquetUrl,
       rowCount: input.profile.rowCount,
+      duplicateRows: input.profile.duplicateRows,
       sampleRows: input.profile.sampleRows,
     })
     .returning({ id: sources.id });
@@ -55,6 +62,7 @@ export async function createSource(input: NewSource): Promise<string> {
         approxUnique: column.approxUnique,
         min: column.min,
         max: column.max,
+        dateWarning: column.dateWarning,
         position,
       })),
     );
@@ -80,6 +88,7 @@ export async function getSourceWithSchema(sourceId: string): Promise<SourceWithS
     tableName: source.tableName,
     parquetUrl: source.parquetUrl,
     rowCount: source.rowCount,
+    duplicateRows: source.duplicateRows,
     sampleRows: source.sampleRows,
     columns: cols.map((c) => ({
       id: c.id,
@@ -89,6 +98,7 @@ export async function getSourceWithSchema(sourceId: string): Promise<SourceWithS
       approxUnique: c.approxUnique,
       min: c.min,
       max: c.max,
+      dateWarning: c.dateWarning,
       description: c.description,
       descriptionSource: c.descriptionSource,
     })),

@@ -24,7 +24,7 @@ beforeAll(async () => {
     kind: 'file',
     tableName: 'orders',
     parquetUrl: 'https://x/orders.parquet',
-    profile: { tableName: 'orders', rowCount: 5, sampleRows: [], columns: [] },
+    profile: { tableName: 'orders', rowCount: 5, sampleRows: [], duplicateRows: 0, columns: [] },
   });
 
   resultId = await saveResult(sourceId, {
@@ -48,7 +48,7 @@ beforeAll(async () => {
     kind: 'file',
     tableName: 'other',
     parquetUrl: 'https://x/other.parquet',
-    profile: { tableName: 'other', rowCount: 1, sampleRows: [], columns: [] },
+    profile: { tableName: 'other', rowCount: 1, sampleRows: [], duplicateRows: 0, columns: [] },
   });
 
   otherResultId = await saveResult(otherSourceId, {

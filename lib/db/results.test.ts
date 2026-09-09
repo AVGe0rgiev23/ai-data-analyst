@@ -5,7 +5,7 @@ import { saveResult, getResult } from './results';
 async function makeSource() {
   return createSource({
     name: 'r.csv', kind: 'file', tableName: 'r', parquetUrl: 'https://x/r.parquet',
-    profile: { tableName: 'r', rowCount: 1, sampleRows: [], columns: [] },
+    profile: { tableName: 'r', rowCount: 1, sampleRows: [], duplicateRows: 0, columns: [] },
   });
 }
 

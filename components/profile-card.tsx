@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertCircle, Loader2, Pencil, Sparkle } from 'lucide-react';
+import { AlertCircle, CalendarOff, Loader2, Pencil, Sparkle } from 'lucide-react';
 import type { SourceWithSchema, StoredColumn } from '@/lib/db/sources';
 import { cn } from '@/lib/ui/cn';
 import { formatCount, formatPercent, isNumericType, shortType } from '@/lib/ui/format';
@@ -190,6 +190,19 @@ export function ProfileCard({
               <Badge mono tone={isNumericType(column.type) ? 'info' : 'neutral'}>
                 {shortType(column.type)}
               </Badge>
+              {/* Diagnostic only. The column is still exactly the text that was
+                  uploaded; this says why it was not read as a date. */}
+              {column.dateWarning && (
+                <Tooltip label={column.dateWarning}>
+                  <span
+                    role="img"
+                    aria-label={`Date format warning: ${column.dateWarning}`}
+                    className="flex h-4 w-4 shrink-0 cursor-default items-center justify-center rounded-xs text-caution"
+                  >
+                    <CalendarOff size={11} strokeWidth={2.2} />
+                  </span>
+                </Tooltip>
+              )}
             </div>
 
             <div className="flex items-center gap-3">

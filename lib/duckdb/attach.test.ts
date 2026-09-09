@@ -26,6 +26,7 @@ describe('attachSource', () => {
       parquetUrl: pathToFileURL(parquet).href,
       rowCount: 5,
       sampleRows: [],
+      duplicateRows: 0,
       columns: [],
     });
     await lockdown(session);

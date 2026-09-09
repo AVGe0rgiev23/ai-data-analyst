@@ -7,6 +7,10 @@ export const sources = pgTable('sources', {
   tableName: text('table_name').notNull(),
   parquetUrl: text('parquet_url').notNull(),
   rowCount: integer('row_count').notNull(),
+  // Rows beyond the first occurrence of each distinct row. Nullable so sources
+  // profiled before this column existed read back as "not measured" rather
+  // than as a confident zero.
+  duplicateRows: integer('duplicate_rows'),
   sampleRows: jsonb('sample_rows').$type<Record<string, unknown>[]>().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
@@ -22,6 +26,9 @@ export const columns = pgTable('columns', {
   max: text('max'),
   description: text('description'),
   descriptionSource: text('description_source', { enum: ['llm', 'user'] }),
+  // Diagnostic only: set when a text column looks date-like but its formats
+  // cannot be read consistently. Never used to reinterpret the data.
+  dateWarning: text('date_warning'),
   position: integer('position').notNull(),
 });
 

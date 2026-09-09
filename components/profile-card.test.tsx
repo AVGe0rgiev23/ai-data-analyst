@@ -11,8 +11,9 @@ const source = {
   parquetUrl: 'https://example/x.parquet',
   rowCount: 1234,
   sampleRows: [],
+  duplicateRows: 0,
   columns: [
-    { id: 'c1', name: 'amount', type: 'DOUBLE', nullPercentage: 12.5, approxUnique: 900, min: '1', max: '99', description: 'Order total', descriptionSource: 'llm' as const },
+    { id: 'c1', name: 'amount', type: 'DOUBLE', nullPercentage: 12.5, approxUnique: 900, min: '1', max: '99', description: 'Order total', descriptionSource: 'llm' as const, dateWarning: null },
   ],
 };
 
@@ -35,7 +36,7 @@ describe('ProfileCard', () => {
   it('does not mark a user-written description as AI-drafted', () => {
     const edited = {
       ...source,
-      columns: [{ ...source.columns[0], descriptionSource: 'user' as const }],
+      columns: [{ ...source.columns[0], descriptionSource: 'user' as const, dateWarning: null }],
     };
     render(<ProfileCard source={edited} />);
     expect(screen.queryByText('drafted by AI')).toBeNull();
@@ -96,7 +97,7 @@ describe('ProfileCard', () => {
         {
           ...source.columns[0],
           description: 'Gross value of the order',
-          descriptionSource: 'llm' as const,
+          descriptionSource: 'llm' as const, dateWarning: null,
         },
       ],
     };

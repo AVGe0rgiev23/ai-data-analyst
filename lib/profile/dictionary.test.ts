@@ -3,11 +3,11 @@ import { buildDictionaryPrompt } from './dictionary';
 
 const source = {
   id: 's1', name: 'orders.csv', kind: 'file' as const, tableName: 'orders',
-  parquetUrl: '', rowCount: 5,
+  parquetUrl: '', rowCount: 5, duplicateRows: 0,
   sampleRows: [{ order_id: 1, customer: 'Acme', amount: 120.5 }],
   columns: [
-    { id: 'c1', name: 'order_id', type: 'BIGINT', nullPercentage: 0, approxUnique: 5, min: '1', max: '5', description: null, descriptionSource: null },
-    { id: 'c2', name: 'amount', type: 'DOUBLE', nullPercentage: 0, approxUnique: 5, min: '15.75', max: '310', description: null, descriptionSource: null },
+    { id: 'c1', name: 'order_id', type: 'BIGINT', nullPercentage: 0, approxUnique: 5, min: '1', max: '5', description: null, descriptionSource: null, dateWarning: null, },
+    { id: 'c2', name: 'amount', type: 'DOUBLE', nullPercentage: 0, approxUnique: 5, min: '15.75', max: '310', description: null, descriptionSource: null, dateWarning: null, },
   ],
 };
 
@@ -25,7 +25,7 @@ describe('buildDictionaryPrompt', () => {
     const withUser = {
       ...source,
       columns: [
-        { ...source.columns[0], description: 'Set by hand', descriptionSource: 'user' as const },
+        { ...source.columns[0], description: 'Set by hand', descriptionSource: 'user' as const, dateWarning: null },
         source.columns[1],
       ],
     };

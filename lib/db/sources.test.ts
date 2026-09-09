@@ -11,10 +11,11 @@ describe('source persistence', () => {
       profile: {
         tableName: 'orders',
         rowCount: 5,
+        duplicateRows: 0,
         sampleRows: [{ order_id: 1, customer: 'Acme' }],
         columns: [
-          { name: 'order_id', type: 'BIGINT', nullPercentage: 0, approxUnique: 5, min: '1', max: '5' },
-          { name: 'customer', type: 'VARCHAR', nullPercentage: 0, approxUnique: 3, min: 'Acme', max: 'Initech' },
+          { name: 'order_id', type: 'BIGINT', nullPercentage: 0, approxUnique: 5, min: '1', max: '5', dateWarning: null },
+          { name: 'customer', type: 'VARCHAR', nullPercentage: 0, approxUnique: 3, min: 'Acme', max: 'Initech', dateWarning: null },
         ],
       },
     });
