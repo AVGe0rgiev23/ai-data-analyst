@@ -6,6 +6,7 @@ import type { StoredResult } from '@/lib/db/results';
 import { cn } from '@/lib/ui/cn';
 import { formatCell, formatCount, formatDuration, isNumericType } from '@/lib/ui/format';
 import { Badge, Button, Tooltip } from '@/components/ui/primitives';
+import { downloadResultCsv } from '@/lib/ui/csv';
 
 type Sort = { column: string; direction: 'asc' | 'desc' } | null;
 
@@ -16,19 +17,6 @@ function compare(a: unknown, b: unknown): number {
   const right = Number(b);
   if (Number.isFinite(left) && Number.isFinite(right)) return left - right;
   return String(a).localeCompare(String(b), undefined, { numeric: true });
-}
-
-function toCsv(result: StoredResult): string {
-  const escape = (value: unknown) => {
-    if (value === null || value === undefined) return '';
-    const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
-  const header = result.columns.map((column) => escape(column.name)).join(',');
-  const body = result.rows.map((row) =>
-    result.columns.map((column) => escape(row[column.name])).join(','),
-  );
-  return [header, ...body].join('\n');
 }
 
 export function ResultTable({ result }: { result: StoredResult }) {
@@ -56,16 +44,6 @@ export function ResultTable({ result }: { result: StoredResult }) {
     );
   }
 
-  function exportCsv() {
-    const blob = new Blob([toCsv(result)], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `result-${result.id.slice(0, 8)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2.5 px-3 py-2">
@@ -81,7 +59,7 @@ export function ResultTable({ result }: { result: StoredResult }) {
         {result.truncated && <Badge tone="caution">truncated</Badge>}
         <div className="ml-auto">
           <Tooltip label="Download as CSV">
-            <Button size="sm" variant="ghost" onClick={exportCsv} aria-label="Download as CSV">
+            <Button size="sm" variant="ghost" onClick={() => downloadResultCsv(result)} aria-label="Download as CSV">
               <Download size={12} strokeWidth={2} />
               Export
             </Button>

@@ -16,12 +16,16 @@ describe('formatSqlToolResult', () => {
     session.close();
   });
 
-  it('adds an explicit warning when truncated', async () => {
+  it('adds an explicit warning when the engine truncated the result', async () => {
+    // rowCount always equals rows.length on a real result (execute.ts sets it
+    // from the array), so the fixture carries the rows it claims to have.
     const formatted = formatSqlToolResult({
-      id: 'r2', sourceId: 's1', sql: 'SELECT 1', columns: [], rows: [],
+      id: 'r2', sourceId: 's1', sql: 'SELECT 1',
+      columns: [{ name: 'a', type: 'INTEGER' }],
+      rows: Array.from({ length: 1000 }, (_, i) => ({ a: i })),
       rowCount: 1000, truncated: true, durationMs: 1,
     });
-    expect(formatted.warning).toMatch(/first 1000 rows/i);
+    expect(formatted.warning).toMatch(/holds only the first 1000/i);
   });
 });
 

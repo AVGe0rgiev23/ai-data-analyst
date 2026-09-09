@@ -3,12 +3,15 @@ import { getSourceWithSchema } from '@/lib/db/sources';
 import { buildSystemPrompt, getModel } from '@/lib/agent/prompt';
 import { createTools } from '@/lib/agent/tools';
 import { toFriendlyAiError } from '@/lib/ai/errors';
+import { readJsonBody } from '@/lib/api/json-body';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { sourceId?: string; messages?: UIMessage[] };
+  const parsed = await readJsonBody<{ sourceId?: string; messages?: UIMessage[] }>(request);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.value;
   if (!body.sourceId || !Array.isArray(body.messages)) {
     return Response.json({ error: 'sourceId and messages are required' }, { status: 400 });
   }

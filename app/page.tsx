@@ -26,6 +26,7 @@ import { EmptyState, Panel } from '@/components/ui/primitives';
 import type { SourceWithSchema } from '@/lib/db/sources';
 import type { StoredResult } from '@/lib/db/results';
 import type { ChartSpec } from '@/lib/charts/spec';
+import { downloadResultCsv } from '@/lib/ui/csv';
 
 export default function Page() {
   const [source, setSource] = useState<SourceWithSchema | null>(null);
@@ -159,7 +160,9 @@ export default function Page() {
         icon: <Download size={14} strokeWidth={2} />,
         keywords: 'download save',
         disabled: !result,
-        run: () => setView('results'),
+        // Actually downloads. A command labelled "Export" that only navigated
+        // was decorative, which is worse than not offering it.
+        run: () => result && downloadResultCsv(result),
       },
       {
         id: 'replace',

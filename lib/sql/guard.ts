@@ -38,11 +38,19 @@ export async function assertReadOnly(
   }
 
   if (parsed.error) {
+    // DuckDB reports both "this will not parse" and "this parses but is not a
+    // statement I can serialise" through the same error field. Leading with
+    // "only SELECT is allowed" on a plain typo sends the reader looking for a
+    // permissions problem they do not have, so the two are separated here.
+    const detail = parsed.error_message ?? '';
+    if (/syntax error|parser error|unexpected/i.test(detail)) {
+      return { ok: false, reason: `This SQL did not parse: ${detail}` };
+    }
     return {
       ok: false,
       reason:
         'Only read-only SELECT queries are allowed. This statement is not a SELECT' +
-        (parsed.error_message ? ` (${parsed.error_message})` : '') + '.',
+        (detail ? ` (${detail})` : '') + '.',
     };
   }
 

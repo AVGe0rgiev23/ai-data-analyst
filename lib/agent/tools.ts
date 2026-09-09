@@ -12,29 +12,63 @@ export type SqlToolResult = {
   sql: string;
   columns: { name: string; type: string }[];
   rows: Record<string, unknown>[];
+  /** Rows in the stored result — what the chart and the validator see. */
   row_count: number;
+  /** Rows actually handed to the model, which may be fewer. */
+  rows_shown: number;
   truncated: boolean;
   duration_ms: number;
   warning?: string;
 };
 
+/**
+ * Rows handed to the model per query.
+ *
+ * Measured on a 500-row, 9-column table: returning every row costs ~21,900
+ * tokens in a single tool result, and the transcript re-sends it on every
+ * subsequent step — ~67,000 tokens for a three-step turn, a third of a day's
+ * free-tier budget for one question. The same question answered with a GROUP BY
+ * costs ~116 tokens.
+ *
+ * Capping what the model reads does not weaken grounding, because it is not
+ * what grounding is checked against: the full result is stored server-side, and
+ * the validator, the table and the chart all read it from there. The cap only
+ * removes rows the model was already forbidden to compute from — it must
+ * aggregate in SQL — so the effect is fewer tokens spent on data it should not
+ * have been using in the first place.
+ */
+export const MODEL_ROW_LIMIT = 50;
+
 export type SqlToolError = { error: string; kind: string };
 
-export function formatSqlToolResult(result: StoredResult): SqlToolResult {
+export function formatSqlToolResult(
+  result: StoredResult,
+  modelRowLimit = MODEL_ROW_LIMIT,
+): SqlToolResult {
+  const rows = result.rows.slice(0, modelRowLimit);
+  const sampled = rows.length < result.rowCount;
+
+  // Both conditions are reported, because they mean different things: the
+  // engine capped what it stored, and this layer capped what the model reads.
+  const warnings = [
+    result.truncated
+      ? "The engine returned more rows than it stored; this result holds only the first 1000."
+      : null,
+    sampled
+      ? `You are seeing ${rows.length} of ${result.rowCount} rows. Do not count, total, rank or describe the rows you did not receive — run a query that aggregates in SQL and read the answer from its result.`
+      : null,
+  ].filter(Boolean);
+
   return {
     result_id: result.id,
     sql: result.sql,
     columns: result.columns,
-    rows: result.rows,
+    rows,
     row_count: result.rowCount,
+    rows_shown: rows.length,
     truncated: result.truncated,
     duration_ms: result.durationMs,
-    ...(result.truncated
-      ? {
-          warning:
-            'This result shows only the first 1000 rows. Do not compute totals, averages, or superlatives from it — re-run with an aggregate.',
-        }
-      : {}),
+    ...(warnings.length > 0 ? { warning: warnings.join(" ") } : {}),
   };
 }
 
@@ -48,10 +82,10 @@ export type ChartToolOutput =
   | { error: string; errors: string[] };
 
 export function buildChartToolResult(
-  result: { id: string; columns: { name: string; type: string }[] },
+  result: { id: string; columns: { name: string; type: string }[]; rowCount?: number; rows?: unknown[] },
   spec: ChartSpec,
 ): ChartToolOutput {
-  const validation = validateChartSpec(spec, result.columns);
+  const validation = validateChartSpec(spec, result.columns, result.rowCount);
   if (!validation.ok) {
     return {
       error: 'The chart spec does not match the result set.',

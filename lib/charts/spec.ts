@@ -29,6 +29,8 @@ const NUMERIC = /INT|DECIMAL|DOUBLE|FLOAT|REAL|NUMERIC|HUGEINT/i;
 export function validateChartSpec(
   spec: ChartSpec,
   columns: { name: string; type: string }[],
+  /** Rows the cited result actually returned. Omitted callers skip the shape checks. */
+  rowCount?: number,
 ): ValidationResult {
   const byName = new Map(columns.map((column) => [column.name, column]));
   const available = columns.map((column) => column.name).join(', ');
@@ -53,6 +55,27 @@ export function validateChartSpec(
     if (column && !NUMERIC.test(column.type)) {
       errors.push(
         `Column "${name}" is ${column.type}, which is not numeric, so it cannot be a y axis. Aggregate it in SQL first.`,
+      );
+    }
+  }
+
+  // Shape checks. A spec can name only valid columns and still draw something
+  // that asserts more than the data supports: a two-point "trend", or a line
+  // through a single row. The prompt already discourages this, but a chart is a
+  // quantitative claim like any other, so it gets a deterministic backstop
+  // rather than relying on the model to behave.
+  if (rowCount !== undefined) {
+    if (rowCount === 0) {
+      errors.push(
+        'This result has no rows, so there is nothing to chart. Report the empty result instead.',
+      );
+    } else if (rowCount === 1) {
+      errors.push(
+        'This result has a single row. One value is a number, not a shape — state it in the answer rather than charting it.',
+      );
+    } else if (rowCount === 2 && (spec.type === 'line' || spec.type === 'area')) {
+      errors.push(
+        'Two points cannot show a trend. Use a bar chart to compare them, or query more of the series.',
       );
     }
   }

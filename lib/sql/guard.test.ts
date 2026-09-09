@@ -51,3 +51,30 @@ describe('assertReadOnly', () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe('error wording', () => {
+  it('reports a typo as a parse failure, not a permissions problem', async () => {
+    const session = await createSession();
+    try {
+      const result = await assertReadOnly(session, 'SELEKT * FROM t');
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toMatch(/did not parse/i);
+        expect(result.reason).not.toMatch(/only read-only select/i);
+      }
+    } finally {
+      session.close();
+    }
+  });
+
+  it('still leads with the read-only rule for a real write statement', async () => {
+    const session = await createSession();
+    try {
+      const result = await assertReadOnly(session, 'DROP TABLE t');
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.reason).toMatch(/only read-only select/i);
+    } finally {
+      session.close();
+    }
+  });
+});

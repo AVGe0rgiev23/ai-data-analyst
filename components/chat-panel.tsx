@@ -13,37 +13,21 @@ import type { ValidationReport } from '@/lib/validate/claims';
 import type { StoredColumn } from '@/lib/db/sources';
 import { cn } from '@/lib/ui/cn';
 import { isNumericType, isTemporalType } from '@/lib/ui/format';
-
-/** Columns that are numeric but are keys, not quantities. */
-const IDENTIFIER = /(^|_)(id|ids|key|code|no|num|number|uuid|guid|hash|zip|postcode)$/i;
-
-/**
- * A numeric column worth summing. "Total order_id" is the kind of suggestion
- * that makes a product look like it cannot read its own schema, so identifier
- * names are rejected outright, and so is any integer column whose distinct
- * count is close to the row count — the shape of a primary key.
- */
-function measureColumn(columns: StoredColumn[], rowCount: number): StoredColumn | undefined {
-  const numeric = columns.filter((column) => isNumericType(column.type));
-  const measures = numeric.filter((column) => {
-    if (IDENTIFIER.test(column.name)) return false;
-    const nearlyUnique = rowCount > 0 && column.approxUnique >= rowCount * 0.9;
-    return !(nearlyUnique && /INT/i.test(column.type));
-  });
-  return measures[0] ?? numeric.find((column) => !IDENTIFIER.test(column.name));
-}
+import { pickMeasure } from '@/lib/profile/measures';
 
 /**
  * Openers built from this dataset's own columns, so they are answerable rather
  * than generic prompts. Nothing here asserts a value — each is a question the
- * agent will have to run SQL to answer.
+ * agent will have to run SQL to answer. Measure selection lives in
+ * lib/profile/measures, where it is tested against both real measures and the
+ * key columns that must never be offered for summing.
  */
 function suggestions(
   columns: StoredColumn[],
   tableName: string,
   rowCount: number,
 ): string[] {
-  const measure = measureColumn(columns, rowCount);
+  const measure = pickMeasure(columns, rowCount);
   const temporal = columns.find((column) => isTemporalType(column.type));
   const categorical = columns.find(
     (column) =>
