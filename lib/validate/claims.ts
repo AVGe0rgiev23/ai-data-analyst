@@ -169,7 +169,7 @@ export function normaliseUnicode(text: string): string {
  */
 function stripNonProse(text: string): string {
   const blank = (match: string) => ' '.repeat(match.length);
-  return text
+  const withoutCode = text
     .replace(/```[\s\S]*?```/g, blank) // fenced code: the model quotes its SQL
     .replace(/`[^`\n]*`/g, blank) // inline code
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, blank) // result_ids
@@ -177,8 +177,87 @@ function stripNonProse(text: string): string {
     // shatter into fragments that are claims about nothing.
     .replace(/\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?/g, blank)
     .replace(/\d{4}-\d{2}(?![-\d])/g, blank)
-    .replace(/^[ \t]*\d+[.)][ \t]/gm, blank) // markdown list numbering
-    .replace(/^[ \t]*\|[\s|:-]*\|[ \t]*$/gm, blank); // markdown table rules
+    .replace(/^[ \t]*\d+[.)][ \t]/gm, blank); // markdown list numbering
+
+  // Runs before the table rules are blanked, because it needs the delimiter row
+  // to tell a real table from a line that merely contains a pipe.
+  return blankRankColumnCells(withoutCode).replace(/^[ \t]*\|[\s|:-]*\|[ \t]*$/gm, blank);
+}
+
+/**
+ * Headers that mark a column as the model's own ordering rather than data.
+ * Deliberately short: "no." and "count" are left out because they read as
+ * "number of", which is a real measure and must keep its evidence requirement.
+ */
+const RANK_HEADER = /^(?:#|rank|position|place)$/i;
+
+/** A cell holding nothing but a small bare integer, optionally "1." or "1)". */
+const RANK_CELL = /^\s*\d{1,3}[.)]?\s*$/;
+
+/** The `|---|:--:|` row that makes a block of pipes a markdown table. */
+const TABLE_DELIMITER = /^[ \t]*\|[\s|:-]*-[\s|:-]*\|[ \t]*$/;
+
+/** Splits a markdown table row into cells that remember where they started. */
+function splitRowCells(line: string): { text: string; start: number }[] {
+  const cells: { text: string; start: number }[] = [];
+  let start = 0;
+  for (const part of line.split('|')) {
+    cells.push({ text: part, start });
+    start += part.length + 1; // the '|' that was consumed
+  }
+  return cells;
+}
+
+/**
+ * Blanks the rank column of a markdown table.
+ *
+ * A model presenting a ranking writes the positions itself:
+ *
+ *   | Rank | Customer | Revenue |
+ *   |------|----------|---------|
+ *   | 1    | Globex   | $835.75 |
+ *
+ * The 1 is a label the model invented to order its own table, not a figure it
+ * read out of a result, so no result set can ever support it. Observed in the
+ * post-tooling-fix baseline: a fully correct answer to the paid-revenue
+ * question failed because 1, 2 and 3 were reported as unsupported numbers.
+ *
+ * Narrow on purpose, because "numbers in tables are presentation" would be a
+ * hole straight through detector 1. Two conditions must both hold: the model
+ * labelled the column a rank in the header, and the cell is a bare small
+ * integer. So $835.75 one cell over is still checked, 1,234 and 45% and 2026
+ * are still checked wherever they appear, and a fabricated figure in a column
+ * headed anything else is still flagged.
+ */
+function blankRankColumnCells(text: string): string {
+  const lines = text.split('\n');
+
+  for (let index = 1; index < lines.length; index += 1) {
+    if (!TABLE_DELIMITER.test(lines[index])) continue;
+    if (!lines[index - 1].includes('|')) continue;
+
+    const rankColumns = splitRowCells(lines[index - 1])
+      .map((cell, column) => (RANK_HEADER.test(cell.text.trim()) ? column : -1))
+      .filter((column) => column >= 0);
+    if (rankColumns.length === 0) continue;
+
+    for (let row = index + 1; row < lines.length; row += 1) {
+      if (!lines[row].includes('|')) break;
+      const cells = splitRowCells(lines[row]);
+      let line = lines[row];
+      for (const column of rankColumns) {
+        const cell = cells[column];
+        if (!cell || !RANK_CELL.test(cell.text)) continue;
+        line =
+          line.slice(0, cell.start) +
+          ' '.repeat(cell.text.length) +
+          line.slice(cell.start + cell.text.length);
+      }
+      lines[row] = line;
+    }
+  }
+
+  return lines.join('\n');
 }
 
 /**

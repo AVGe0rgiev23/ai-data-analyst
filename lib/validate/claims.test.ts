@@ -308,3 +308,93 @@ describe('schema metadata as evidence', () => {
     expect(unsupportedTexts('There are 16 orders.', [plain()])).toContain('16');
   });
 });
+
+describe('markdown rank columns', () => {
+  // The post-tooling-fix baseline failure: the agent answered the paid-revenue
+  // question correctly, in a table, and the rank labels it wrote to order that
+  // table were reported as unsupported figures.
+  const ranked = result({
+    rows: [
+      { customer: 'Globex', total_revenue: 835.75 },
+      { customer: 'Acme', total_revenue: 810 },
+      { customer: 'Umbrella', total_revenue: 545.75 },
+    ],
+    rowCount: 3,
+  });
+
+  const table = [
+    '| Rank | Customer | Revenue |',
+    '|------|----------|---------|',
+    '| 1    | Globex   | $835.75 |',
+    '| 2    | Acme     | $810.00 |',
+    '| 3    | Umbrella | $545.75 |',
+  ].join('\n');
+
+  it('ignores the ordinals in a rank column', () => {
+    expect(unsupportedTexts(table, [ranked])).toEqual([]);
+  });
+
+  it('still validates the real figures in the same table', () => {
+    const wrong = table.replace('$810.00', '$811.00');
+    expect(unsupportedTexts(wrong, [ranked])).toContain('$811.00');
+  });
+
+  it('still flags a fabricated number in a non-rank cell of a ranked table', () => {
+    const withExtra = [
+      '| Rank | Customer | Revenue | Share |',
+      '|------|----------|---------|-------|',
+      '| 1    | Globex   | $835.75 | 42    |',
+    ].join('\n');
+    expect(unsupportedTexts(withExtra, [ranked])).toContain('42');
+  });
+
+  it('leaves numbers in a table with no rank column alone', () => {
+    const plainTable = [
+      '| Customer | Revenue |',
+      '|----------|---------|',
+      '| 1        | $835.75 |',
+    ].join('\n');
+    expect(unsupportedTexts(plainTable, [ranked])).toContain('1');
+  });
+
+  it('accepts the other headers that label an ordering', () => {
+    for (const header of ['#', 'Position', 'Place']) {
+      const other = table.replace('Rank', header.padEnd(4));
+      expect(unsupportedTexts(other, [ranked])).toEqual([]);
+    }
+  });
+
+  it('does not treat a count column as an ordering', () => {
+    // "No." reads as "number of", so it keeps its evidence requirement.
+    const counts = [
+      '| No. | Customer |',
+      '|-----|----------|',
+      '| 42  | Globex   |',
+    ].join('\n');
+    expect(unsupportedTexts(counts, [ranked])).toContain('42');
+  });
+
+  it('only blanks bare small integers, not quantities that happen to sit in the column', () => {
+    const quantities = [
+      '| Rank | Customer |',
+      '|------|----------|',
+      '| 1,234 | Globex  |',
+      '| 45%   | Acme    |',
+      '| $99   | Initech |',
+    ].join('\n');
+    const flagged = unsupportedTexts(quantities, [ranked]);
+    expect(flagged).toContain('1,234');
+    expect(flagged).toContain('45%');
+    expect(flagged).toContain('$99');
+  });
+
+  it('needs a delimiter row, so pipes in prose are not a table', () => {
+    expect(unsupportedTexts('Rank | 1 | is not a table.', [ranked])).toContain('1');
+  });
+
+  it('keeps context offsets aligned with the prose', () => {
+    const wrong = table.replace('$810.00', '$811.00');
+    const claim = validateClaims(wrong, [ranked]).unsupported[0];
+    expect(claim.context).toContain('811.00');
+  });
+});

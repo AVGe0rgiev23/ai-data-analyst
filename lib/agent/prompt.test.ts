@@ -33,6 +33,29 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/ask_clarification/);
   });
 
+  it('puts answering ahead of asking when the question is answerable', () => {
+    // Observed failure: asked for revenue by region, the agent called
+    // ask_clarification about paid-versus-all instead of querying. A column it
+    // could have filtered on is not an ambiguity.
+    const prompt = buildSystemPrompt(source);
+    expect(prompt).toMatch(/answer when you can/i);
+    expect(prompt).toMatch(/unless the user restricted it/i);
+  });
+
+  it('forbids clarifying once a query has already answered the question', () => {
+    // Observed failure: the agent ran the right query for Q1 revenue, received
+    // 1851.5, then asked for clarification and never reported the figure.
+    expect(buildSystemPrompt(source)).toMatch(
+      /never call ask_clarification once a query has already answered/i,
+    );
+  });
+
+  it('still reserves clarification for genuine ambiguity', () => {
+    const prompt = buildSystemPrompt(source);
+    expect(prompt).toMatch(/reserve ask_clarification/i);
+    expect(prompt).toMatch(/no basis in the schema/i);
+  });
+
   it('warns about truncated results', () => {
     expect(buildSystemPrompt(source)).toMatch(/truncated/i);
   });
