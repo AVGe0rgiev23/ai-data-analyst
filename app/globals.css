@@ -1,26 +1,329 @@
 @import "tailwindcss";
 
+/*
+ * Theme is driven by an explicit `data-theme` attribute, not by
+ * prefers-color-scheme. The inline script in layout.tsx resolves "system" to a
+ * concrete light/dark value before paint, so the attribute is always one of the
+ * two and every `dark:` utility in the app keeps working unchanged.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── Light ────────────────────────────────────────────────────────────────
+   A analytical instrument in daylight: paper-white canvas, cool grey ink,
+   hairline rules. Surfaces separate by a few points of luminance, never by
+   heavy shadow. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --canvas: #fbfbfa;
+  --surface: #ffffff;
+  --panel: #ffffff;
+  --elevated: #ffffff;
+  --sunken: #f4f4f3;
+
+  --hover: rgb(0 0 0 / 0.035);
+  --active: rgb(0 0 0 / 0.06);
+  --selected: rgb(13 148 165 / 0.09);
+
+  --line-subtle: rgb(16 20 24 / 0.06);
+  --line: rgb(16 20 24 / 0.11);
+  --line-strong: rgb(16 20 24 / 0.2);
+
+  --ink: #14181c;
+  --ink-secondary: #5b6570;
+  --ink-muted: #8b949e;
+  --ink-faint: #aeb6be;
+  --ink-inverse: #ffffff;
+
+  /* One sharp accent. Instrument teal — it marks what is live, focused or
+     verified, and appears nowhere decorative. */
+  --accent: #0d94a5;
+  --accent-hover: #0a7d8c;
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(13 148 165 / 0.1);
+  --accent-line: rgb(13 148 165 / 0.32);
+
+  --positive: #16794a;
+  --positive-soft: rgb(22 121 74 / 0.1);
+  --negative: #b4293b;
+  --negative-soft: rgb(180 41 59 / 0.09);
+  --caution: #92650a;
+  --caution-soft: rgb(146 101 10 / 0.11);
+  --info: #1c5fb0;
+  --info-soft: rgb(28 95 176 / 0.09);
+
+  --shadow-sm: 0 1px 2px rgb(16 20 24 / 0.05);
+  --shadow: 0 1px 2px rgb(16 20 24 / 0.05), 0 4px 12px -2px rgb(16 20 24 / 0.07);
+  --shadow-lg: 0 1px 2px rgb(16 20 24 / 0.05), 0 16px 40px -8px rgb(16 20 24 / 0.16);
+
+  /* Chart series, in fixed assignment order — never cycled, and identical in
+     meaning across both themes. Each mode's six steps were selected against
+     that mode's own surface and pass all five checks of the palette validator
+     (lightness band, chroma floor, adjacent-pair CVD, normal-vision floor,
+     contrast). Green and rose are deliberately non-adjacent: under deuteranopia
+     they are the one pair that cannot be separated by hue. */
+  --series-1: #0d8fa1;
+  --series-2: #c2710c;
+  --series-3: #992740;
+  --series-4: #4f46c8;
+  --series-5: #3f9d61;
+  --series-6: #9333a8;
+
+  color-scheme: light;
+}
+
+/* ── Dark ─────────────────────────────────────────────────────────────────
+   The workstation. Not black — a cool near-black that lets six surface
+   levels sit above it without any of them glowing. */
+:root[data-theme="dark"] {
+  --canvas: #0a0c0e;
+  --surface: #0e1113;
+  --panel: #131719;
+  --elevated: #181c1f;
+  --sunken: #08090b;
+
+  --hover: rgb(255 255 255 / 0.04);
+  --active: rgb(255 255 255 / 0.07);
+  --selected: rgb(45 200 214 / 0.11);
+
+  --line-subtle: rgb(255 255 255 / 0.06);
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.18);
+
+  --ink: #e6e9ec;
+  --ink-secondary: #99a2ab;
+  --ink-muted: #6d7780;
+  --ink-faint: #4c555d;
+  --ink-inverse: #0a0c0e;
+
+  --accent: #2dc8d6;
+  --accent-hover: #4ad6e2;
+  --accent-ink: #04191c;
+  --accent-soft: rgb(45 200 214 / 0.13);
+  --accent-line: rgb(45 200 214 / 0.38);
+
+  --positive: #46c98a;
+  --positive-soft: rgb(70 201 138 / 0.13);
+  --negative: #f0707f;
+  --negative-soft: rgb(240 112 127 / 0.13);
+  --caution: #e0a53c;
+  --caution-soft: rgb(224 165 60 / 0.13);
+  --info: #6aa5f0;
+  --info-soft: rgb(106 165 240 / 0.13);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow: 0 2px 4px rgb(0 0 0 / 0.4), 0 8px 24px -4px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.4), 0 24px 56px -12px rgb(0 0 0 / 0.7);
+
+  --series-1: #16a2b0;
+  --series-2: #b08228;
+  --series-3: #c8455c;
+  --series-4: #7a82e8;
+  --series-5: #2f9d68;
+  --series-6: #b268cc;
+
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-panel: var(--panel);
+  --color-elevated: var(--elevated);
+  --color-sunken: var(--sunken);
+
+  --color-hover: var(--hover);
+  --color-active: var(--active);
+  --color-selected: var(--selected);
+
+  --color-line-subtle: var(--line-subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-negative: var(--negative);
+  --color-negative-soft: var(--negative-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Deliberately tight. An analytical shell is dense; radii above 8px start
+     reading as consumer software. */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow);
+  --shadow-lg: var(--shadow-lg);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "cv05" 1, "ss02" 1;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Every figure in this product is meant to be compared down a column. */
+  th,
+  td,
+  [data-numeric],
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-radius: 2px;
+  }
+
+  /* Focus rings are the accessibility contract; never let a component drop one
+     without providing its own. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-faint);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* The one piece of atmosphere in the product: a 1px grid, at 2% opacity,
+     behind empty analytical space. It reads as graph paper rather than
+     decoration, and disappears the moment content sits on top of it. */
+  .grid-field {
+    background-image: linear-gradient(var(--line-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-subtle) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+  }
+
+  /* Fades the graph paper out toward the edges, so it frames the content
+     instead of tiling the whole viewport. */
+  .grid-fade {
+    -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 38%, #000 20%, transparent 100%);
+    mask-image: radial-gradient(ellipse 70% 55% at 50% 38%, #000 20%, transparent 100%);
+  }
+
+  .hairline-b {
+    box-shadow: inset 0 -1px 0 var(--line-subtle);
+  }
+  .hairline-t {
+    box-shadow: inset 0 1px 0 var(--line-subtle);
+  }
+  .hairline-r {
+    box-shadow: inset -1px 0 0 var(--line-subtle);
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation: fade-rise 240ms var(--ease-out) both;
+  }
+  .animate-pop {
+    animation: pop 160ms var(--ease-out) both;
+  }
+  .animate-sweep {
+    animation: sweep 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Motion is a garnish here, never a carrier of meaning, so removing it costs
+   the user nothing. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

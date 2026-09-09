@@ -1,7 +1,37 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertCircle, Loader2, Pencil, Sparkle } from 'lucide-react';
 import type { SourceWithSchema, StoredColumn } from '@/lib/db/sources';
+import { cn } from '@/lib/ui/cn';
+import { formatCount, formatPercent, isNumericType, shortType } from '@/lib/ui/format';
+import { Badge, Button, Tooltip } from '@/components/ui/primitives';
+
+/** Bar showing how much of a column is populated. Width is the real coverage. */
+function Coverage({ nullPercentage }: { nullPercentage: number }) {
+  const filled = Math.max(0, Math.min(100, 100 - nullPercentage));
+  const complete = nullPercentage === 0;
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        aria-hidden
+        className="h-1 w-10 shrink-0 overflow-hidden rounded-full bg-sunken"
+      >
+        <span
+          className={cn(
+            'block h-full rounded-full',
+            complete ? 'bg-positive/55' : nullPercentage > 25 ? 'bg-caution' : 'bg-accent/70',
+          )}
+          style={{ width: `${filled}%` }}
+        />
+      </span>
+      {/* Exact string preserved for the profile test and for screen readers. */}
+      <span className="whitespace-nowrap text-[11px] text-ink-muted tabular">
+        {formatPercent(nullPercentage)} null
+      </span>
+    </span>
+  );
+}
 
 function ColumnDescription({ column }: { column: StoredColumn }) {
   const [editing, setEditing] = useState(false);
@@ -34,7 +64,7 @@ function ColumnDescription({ column }: { column: StoredColumn }) {
       <input
         autoFocus
         aria-label={`Description for ${column.name}`}
-        className="mt-0.5 w-full rounded border border-neutral-300 dark:border-neutral-700 bg-transparent px-1.5 py-0.5 text-sm"
+        className="w-full rounded-sm border border-accent-line bg-surface px-1.5 py-0.5 text-[12.5px] text-ink outline-none"
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onBlur={save}
@@ -50,24 +80,32 @@ function ColumnDescription({ column }: { column: StoredColumn }) {
   }
 
   return (
-    <p className="mt-0.5 flex items-center gap-2">
+    <span className="flex items-center gap-1.5">
       <button
         type="button"
-        className="text-left text-sm text-neutral-600 dark:text-neutral-400 hover:underline"
         onClick={() => setEditing(true)}
+        className={cn(
+          'group/desc inline-flex min-w-0 items-center gap-1 rounded-sm text-left text-[12.5px]',
+          'transition-colors duration-150',
+          value ? 'text-ink-secondary hover:text-ink' : 'text-ink-faint hover:text-ink-secondary',
+        )}
       >
-        {value || 'Add a description'}
+        <span className="truncate">{value || 'Add a description'}</span>
+        <Pencil
+          size={10}
+          strokeWidth={2}
+          className="shrink-0 opacity-0 transition-opacity duration-150 group-hover/desc:opacity-60"
+        />
       </button>
       {source === 'llm' && (
-        <span
-          title="Drafted by AI — not yet reviewed by a human"
-          className="shrink-0 rounded bg-amber-100 dark:bg-amber-950 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-800 dark:text-amber-300"
-        >
-          drafted by AI
-        </span>
+        <Tooltip label="Drafted by the model — not yet reviewed">
+          <Badge tone="caution" className="cursor-default">
+            drafted by AI
+          </Badge>
+        </Tooltip>
       )}
-      {error && <span className="text-xs text-red-600">Could not save</span>}
-    </p>
+      {error && <span className="text-[11px] text-negative">Could not save</span>}
+    </span>
   );
 }
 
@@ -99,58 +137,94 @@ export function ProfileCard({
   }
 
   return (
-    <section className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-4">
-      <header className="flex items-baseline justify-between">
-        <h2 className="font-medium">{source.name}</h2>
-        <span className="text-sm text-neutral-500">
-          <span>{source.rowCount.toLocaleString()}</span> rows
-        </span>
+    <section className="overflow-hidden rounded-lg border border-line bg-panel">
+      <header className="flex h-10 items-center justify-between gap-3 border-b border-line-subtle px-3">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h2 className="truncate text-[12.5px] font-semibold tracking-tight text-ink">
+            {source.name}
+          </h2>
+          <span className="whitespace-nowrap text-[11px] text-ink-muted">
+            <span className="tabular">{formatCount(source.rowCount)}</span> rows
+          </span>
+        </div>
+        {onSourceUpdated && (
+          <Button size="sm" variant="secondary" disabled={drafting} onClick={describeColumns}>
+            {drafting ? (
+              <>
+                <Loader2 size={11} strokeWidth={2.5} className="animate-spin" />
+                Describing…
+              </>
+            ) : (
+              <>
+                <Sparkle size={11} strokeWidth={2.2} />
+                Describe columns
+              </>
+            )}
+          </Button>
+        )}
       </header>
-      <p className="mt-1 text-xs text-neutral-500">
-        Queryable as <code>{source.tableName}</code>
-      </p>
 
-      {onSourceUpdated && (
-        <div className="mt-3 flex items-center gap-3">
-          <button
-            type="button"
-            disabled={drafting}
-            onClick={describeColumns}
-            className="rounded border border-neutral-300 dark:border-neutral-700 px-2.5 py-1 text-xs disabled:opacity-50"
-          >
-            {drafting ? 'Describing…' : 'Describe columns'}
-          </button>
-          {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 border-b border-line-subtle bg-caution-soft px-3 py-2"
+        >
+          <AlertCircle size={13} strokeWidth={2} className="mt-px shrink-0 text-caution" />
+          <p className="text-[11.5px] leading-relaxed text-ink-secondary">{error}</p>
         </div>
       )}
 
-      <ul className="mt-3 divide-y divide-neutral-200 dark:divide-neutral-800">
+      <ul className="divide-y divide-line-subtle">
         {source.columns.map((column) => (
-          <li key={column.id} className="py-2">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm">{column.name}</span>
-              <span className="rounded bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-xs">
-                {column.type}
+          <li
+            key={column.id}
+            className="grid grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-1 px-3 py-2 transition-colors duration-150 hover:bg-hover sm:grid-cols-[minmax(9rem,1.1fr)_auto_minmax(0,1.4fr)] sm:items-center"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="truncate font-mono text-[12.5px] font-medium text-ink"
+                title={column.name}
+              >
+                {column.name}
               </span>
-              <span className="text-xs text-neutral-500">
-                {column.nullPercentage}% null
-              </span>
-              <span className="text-xs text-neutral-500">
-                {column.approxUnique.toLocaleString()} distinct
+              <Badge mono tone={isNumericType(column.type) ? 'info' : 'neutral'}>
+                {shortType(column.type)}
+              </Badge>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Coverage nullPercentage={column.nullPercentage} />
+              {/* approx_count_distinct is a sketch, not a count: on this fixture
+                  it reports 18 distinct values in 16 rows. Presenting an
+                  estimate as exact is the one thing this product must not do,
+                  so the tilde stays. */}
+              <span
+                title={`Approximately ${formatCount(column.approxUnique)} distinct values (HyperLogLog estimate)`}
+                className="whitespace-nowrap text-[11px] text-ink-muted tabular"
+              >
+                ~{formatCount(column.approxUnique)} distinct
               </span>
             </div>
-            {/*
-              Keyed on the server-provided description so refreshed data
-              remounts the editor with the new text. Without this, the
-              useState initialiser inside it only ever runs once and newly
-              drafted descriptions never appear. The key is unchanged by a
-              plain parent re-render, so an unsaved or just-saved local edit
-              survives.
-            */}
-            <ColumnDescription
-              key={`${column.id}:${column.descriptionSource ?? 'none'}:${column.description ?? ''}`}
-              column={column}
-            />
+
+            <div className="min-w-0">
+              <ColumnDescription
+                /*
+                  Keyed on the server-provided description so refreshed data
+                  remounts the editor with the new text. Without this, the
+                  useState initialiser inside it only ever runs once and newly
+                  drafted descriptions never appear. The key is unchanged by a
+                  plain parent re-render, so an unsaved or just-saved local edit
+                  survives.
+                */
+                key={`${column.id}:${column.descriptionSource ?? 'none'}:${column.description ?? ''}`}
+                column={column}
+              />
+              {(column.min !== null || column.max !== null) && (
+                <p className="mt-0.5 truncate font-mono text-[10.5px] text-ink-faint tabular">
+                  {column.min ?? '—'} … {column.max ?? '—'}
+                </p>
+              )}
+            </div>
           </li>
         ))}
       </ul>

@@ -1,11 +1,15 @@
 'use client';
 
+import { ShieldAlert, ShieldCheck } from 'lucide-react';
 import type { ValidationReport } from '@/lib/validate/claims';
 
 /**
  * Flags, never suppression. The answer always renders; unsupported claims are
  * marked beside it so the reader knows which figures the engine actually
  * produced and which the model asserted on its own.
+ *
+ * This is the one place in the interface where colour carries a verdict, so it
+ * never carries it alone: each state has its own icon and its own wording.
  */
 export function ClaimFlags({ report }: { report: ValidationReport | null }) {
   if (!report) return null;
@@ -15,26 +19,34 @@ export function ClaimFlags({ report }: { report: ValidationReport | null }) {
 
   if (report.unsupported.length === 0) {
     return (
-      <p className="mt-2 rounded border border-emerald-500/40 bg-emerald-50 px-2 py-1 text-xs text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+      <p className="mt-2 flex items-center gap-1.5 rounded-md border border-positive/30 bg-positive-soft px-2 py-1 text-[11.5px] text-positive">
+        <ShieldCheck size={12} strokeWidth={2.2} className="shrink-0" />
         All {checked} quantitative {checked === 1 ? 'claim' : 'claims'} trace to a result set.
       </p>
     );
   }
 
   return (
-    <div className="mt-2 rounded border border-amber-500/50 bg-amber-50 p-2 dark:bg-amber-950/30">
-      <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+    <div className="mt-2 overflow-hidden rounded-md border border-caution/40 bg-caution-soft">
+      <p className="flex items-center gap-1.5 px-2 py-1.5 text-[11.5px] font-medium text-caution">
+        <ShieldAlert size={12} strokeWidth={2.2} className="shrink-0" />
         {report.unsupported.length} of {checked} quantitative{' '}
         {checked === 1 ? 'claim' : 'claims'} could not be traced to a result set
       </p>
-      <ul className="mt-1 space-y-1">
+      <ul className="space-y-1.5 border-t border-caution/25 px-2 py-1.5">
         {report.unsupported.map((claim, index) => (
-          <li key={index} className="text-xs text-amber-900 dark:text-amber-200">
-            <span className="font-mono font-medium">{claim.text}</span>
-            <span className="ml-1 rounded bg-amber-200/70 px-1 text-[10px] uppercase tracking-wide dark:bg-amber-900/60">
-              {claim.severity === 'unsupported_number' ? 'not in any result' : 'never queried'}
+          <li key={index} className="text-[11.5px] leading-relaxed">
+            <span className="flex flex-wrap items-center gap-1.5">
+              <code className="rounded-xs bg-caution/15 px-1 py-px font-mono font-medium text-ink">
+                {claim.text}
+              </code>
+              <span className="rounded-xs border border-caution/30 px-1 py-px text-[10px] font-medium uppercase tracking-[0.05em] text-caution">
+                {claim.severity === 'unsupported_number' ? 'not in any result' : 'never queried'}
+              </span>
             </span>
-            {claim.reason && <p className="mt-0.5 opacity-80">{claim.reason}</p>}
+            {claim.reason && (
+              <p className="mt-0.5 text-[11px] text-ink-muted">{claim.reason}</p>
+            )}
           </li>
         ))}
       </ul>

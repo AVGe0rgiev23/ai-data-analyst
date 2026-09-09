@@ -1,95 +1,89 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { BarChart3, FileText, Table2 } from 'lucide-react';
 import type { StoredResult } from '@/lib/db/results';
 import type { ChartSpec } from '@/lib/charts/spec';
 import { ChartView } from './chart-view';
 import { ResultTable } from './result-table';
-import { SqlRunner } from './sql-runner';
+import { AnswerText } from './answer-text';
+import { EmptyState, Segmented } from '@/components/ui/primitives';
 
-export type Tab = 'answer' | 'chart' | 'data' | 'sql';
-const TABS: Tab[] = ['answer', 'chart', 'data', 'sql'];
+export type Tab = 'answer' | 'chart' | 'data';
+const TABS: { value: Tab; label: string; icon: React.ReactNode }[] = [
+  { value: 'answer', label: 'Answer', icon: <FileText size={12} strokeWidth={2} /> },
+  { value: 'chart', label: 'Chart', icon: <BarChart3 size={12} strokeWidth={2} /> },
+  { value: 'data', label: 'Data', icon: <Table2 size={12} strokeWidth={2} /> },
+];
 
+/**
+ * The right-hand surface of the analysis workspace: the same turn, seen three
+ * ways. The tabs are views of one answer rather than separate places, so the
+ * SQL that produced the rows is never more than one click from the prose.
+ */
 export function Canvas({
-  sourceId,
-  resultId,
+  result,
   spec,
   answer,
   activeTab,
   onTabChange,
 }: {
-  sourceId: string;
-  resultId: string | null;
+  result: StoredResult | null;
   spec: ChartSpec | null;
   answer: string;
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
 }) {
-  const [result, setResult] = useState<StoredResult | null>(null);
-
-  useEffect(() => {
-    // No synchronous reset here: the canvas unmounts when the source is
-    // cleared, and setState directly in an effect body is a React anti-pattern.
-    if (!resultId) return;
-    let cancelled = false;
-    void fetch(`/api/results/${resultId}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((json) => {
-        if (!cancelled) setResult(json);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [resultId]);
-
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <nav className="flex gap-1 border-b border-neutral-200 dark:border-neutral-800 px-3">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => onTabChange(tab)}
-            className={`px-3 py-2 text-sm capitalize ${
-              activeTab === tab
-                ? 'border-b-2 border-neutral-900 dark:border-white font-medium'
-                : 'text-neutral-500'
-            }`}
+    <div className="flex h-full min-h-0 flex-col bg-panel">
+      <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-line px-3">
+        <Segmented options={TABS} value={activeTab} onChange={onTabChange} label="Result view" />
+        {result && (
+          <code
+            title={`Result ${result.id}`}
+            className="hidden shrink-0 rounded-xs border border-line bg-sunken px-1.5 py-px font-mono text-[10.5px] text-ink-muted sm:block"
           >
-            {tab}
-          </button>
-        ))}
-      </nav>
-
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        {activeTab === 'answer' && (
-          <p className="whitespace-pre-wrap text-sm">{answer || 'No answer yet.'}</p>
+            {result.id.slice(0, 8)}
+          </code>
         )}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {activeTab === 'answer' &&
+          (answer ? (
+            <div className="h-full overflow-y-auto px-4 py-3">
+              <AnswerText text={answer} className="mx-auto max-w-2xl" />
+            </div>
+          ) : (
+            <EmptyState
+              icon={<FileText size={16} strokeWidth={1.8} />}
+              title="No answer yet"
+              description="Ask a question and the analyst's write-up appears here."
+            />
+          ))}
 
         {activeTab === 'chart' &&
           (spec && result ? (
-            <ChartView spec={spec} rows={result.rows} />
+            <div className="h-full overflow-hidden p-4">
+              <ChartView spec={spec} rows={result.rows} />
+            </div>
           ) : (
-            <p className="text-sm text-neutral-500">No chart for this answer.</p>
+            <EmptyState
+              icon={<BarChart3 size={16} strokeWidth={1.8} />}
+              title="No chart for this answer"
+              description="The analyst charts a result when the shape of the data carries the point — a trend, a comparison, a distribution."
+            />
           ))}
 
         {activeTab === 'data' &&
           (result ? (
             <ResultTable result={result} />
           ) : (
-            <p className="text-sm text-neutral-500">
-              Ask a question on the left, or run SQL yourself, and the rows appear here.
-            </p>
+            <EmptyState
+              icon={<Table2 size={16} strokeWidth={1.8} />}
+              title="No rows yet"
+              description="Ask a question, or run SQL yourself, and the rows the engine returned appear here."
+            />
           ))}
-
-        {activeTab === 'sql' && (
-          <SqlRunner
-            key={result?.id ?? 'seed'}
-            sourceId={sourceId}
-            initialSql={result?.sql ?? 'SELECT 1'}
-            onResult={setResult}
-          />
-        )}
       </div>
     </div>
   );
