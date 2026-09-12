@@ -19,20 +19,46 @@ export function isTemporalType(type: string): boolean {
   return /DATE|TIME|TIMESTAMP/i.test(type);
 }
 
+/** Significant decimal digits a double always carries exactly. */
+const DOUBLE_DIGITS = 15;
+
 /**
  * A single result cell. Numbers get grouping separators at full precision;
  * everything else is passed through untouched.
+ *
+ * A JS number is read at 15 significant digits first. A double does not carry
+ * more than that, so the digits past it in its shortest printed form are
+ * binary representation noise: a SUM over two-decimal revenue prints as
+ * 2496265.2099999976. Dropping them removes nothing the engine could have
+ * meant. Strings are never re-parsed as numbers — DuckDB sends out-of-range
+ * BIGINT and wide DECIMAL as text precisely so that no digit is lost, and
+ * grouping them through Number() used to change the last ones.
  */
 export function formatCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'boolean') return value ? 'true' : 'false';
 
-  const text = String(value);
+  const text =
+    typeof value === 'number' && Number.isFinite(value)
+      ? String(Number(value.toPrecision(DOUBLE_DIGITS)))
+      : String(value);
   if (!DECIMAL.test(text)) return text;
 
   const [whole, fraction] = text.split('.');
-  const grouped = Number(whole).toLocaleString('en-US');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return fraction ? `${grouped}.${fraction}` : grouped;
+}
+
+const MIDNIGHT = /^(\d{4}-\d{2}-\d{2})[ T]00:00:00(?:\.0+)?Z?$/;
+
+/**
+ * An axis tick or tooltip heading. date_trunc returns TIMESTAMPs, so a monthly
+ * series arrives as "2025-07-01 00:00:00"; on an axis the midnight says nothing
+ * and crowds out the date. Tables keep the full value, where the type matters.
+ */
+export function formatAxisLabel(value: unknown): string {
+  const text = formatCell(value);
+  return text.replace(MIDNIGHT, '$1');
 }
 
 /** Whole counts: 4,281. */
