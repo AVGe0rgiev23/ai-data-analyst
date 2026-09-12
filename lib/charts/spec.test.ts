@@ -100,3 +100,44 @@ describe('result shape', () => {
     expect(validateChartSpec(base, columns).ok).toBe(true);
   });
 });
+
+describe('series column', () => {
+  const columns = [
+    { name: 'month', type: 'DATE' },
+    { name: 'region', type: 'VARCHAR' },
+    { name: 'revenue', type: 'DOUBLE' },
+    { name: 'orders', type: 'BIGINT' },
+  ];
+  const base = {
+    type: 'line' as const, title: 'Revenue by month and region', x: 'month', y: ['revenue'],
+    series: 'region', stacked: false, sort: 'none' as const, limit: 50,
+  };
+  const rowsFor = (regions: string[]) =>
+    regions.flatMap((region) =>
+      ['2025-01-01', '2025-02-01', '2025-03-01'].map((month) => ({ month, region, revenue: 1, orders: 1 })),
+    );
+
+  it('accepts a series column with one y column', () => {
+    const rows = rowsFor(['North', 'South']);
+    expect(validateChartSpec(base, columns, rows.length, rows).ok).toBe(true);
+  });
+
+  it('rejects a series combined with more than one y column', () => {
+    const result = validateChartSpec({ ...base, y: ['revenue', 'orders'] }, columns);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join(' ')).toMatch(/one y column/i);
+  });
+
+  it('rejects a series on a pie chart, which has no axis to split', () => {
+    const result = validateChartSpec({ ...base, type: 'pie' }, columns);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join(' ')).toMatch(/line, area or bar/i);
+  });
+
+  it('rejects more series values than there are distinguishable colours', () => {
+    const rows = rowsFor(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
+    const result = validateChartSpec(base, columns, rows.length, rows);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join(' ')).toMatch(/7 distinct values/);
+  });
+});

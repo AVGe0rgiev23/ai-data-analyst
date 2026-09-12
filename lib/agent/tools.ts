@@ -82,10 +82,15 @@ export type ChartToolOutput =
   | { error: string; errors: string[] };
 
 export function buildChartToolResult(
-  result: { id: string; columns: { name: string; type: string }[]; rowCount?: number; rows?: unknown[] },
+  result: {
+    id: string;
+    columns: { name: string; type: string }[];
+    rowCount?: number;
+    rows?: Record<string, unknown>[];
+  },
   spec: ChartSpec,
 ): ChartToolOutput {
-  const validation = validateChartSpec(spec, result.columns, result.rowCount);
+  const validation = validateChartSpec(spec, result.columns, result.rowCount, result.rows);
   if (!validation.ok) {
     return {
       error: 'The chart spec does not match the result set.',

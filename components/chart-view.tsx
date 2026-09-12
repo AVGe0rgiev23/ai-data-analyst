@@ -6,7 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
 import type { ChartSpec } from '@/lib/charts/spec';
-import { formatCell, formatCompact } from '@/lib/ui/format';
+import { formatAxisLabel, formatCell, formatCompact } from '@/lib/ui/format';
 
 /*
  * Series colours come from --series-1..6 in the token layer, assigned in fixed
@@ -26,22 +26,82 @@ function seriesColor(index: number): string {
   return SERIES[index % SERIES.length];
 }
 
+export type ChartSeries = { key: string; label: string };
+export type PreparedChart = { data: Record<string, unknown>[]; series: ChartSeries[] };
+
+/** Chart types whose x axis is an ordered scale rather than a set of categories. */
+const ORDERED_AXIS = new Set<ChartSpec['type']>(['line', 'area', 'scatter']);
+
+/** Numbers numerically; text naturally, which also orders ISO dates correctly. */
+function compareAxis(left: unknown, right: unknown): number {
+  if (typeof left === 'number' && typeof right === 'number') return left - right;
+  return String(left ?? '').localeCompare(String(right ?? ''), 'en', { numeric: true });
+}
+
 /**
- * Sorting and limiting happen here, on rows that came from the result set. The
- * values themselves are never transformed — what the SQL returned is what the
- * chart draws.
+ * Long format to wide: one point per x value, one key per series value. SQL
+ * returns "month, region, revenue" as a row per month per region; a chart needs
+ * each region as its own line. Series keys are generated so that a value that
+ * happens to equal a column name cannot overwrite that column.
  */
-export function prepareRows(spec: ChartSpec, rows: Record<string, unknown>[]) {
-  const key = spec.y[0];
+function pivot(spec: ChartSpec, column: string, rows: Record<string, unknown>[]): PreparedChart {
+  const measure = spec.y[0];
+  const points = new Map<string, Record<string, unknown>>();
+  const keys = new Map<string, string>();
+  const series: ChartSeries[] = [];
+
+  for (const row of rows) {
+    const label = formatCell(row[column]) || '(blank)';
+    let key = keys.get(label);
+    if (!key) {
+      key = `__series_${series.length}`;
+      keys.set(label, key);
+      series.push({ key, label });
+    }
+
+    const id = String(row[spec.x]);
+    let point = points.get(id);
+    if (!point) {
+      point = { [spec.x]: row[spec.x] };
+      points.set(id, point);
+    }
+    point[key] = row[measure];
+  }
+
+  return { data: [...points.values()], series };
+}
+
+/**
+ * Shapes, sorts and limits rows that came from the result set. The values
+ * themselves are never transformed — what the SQL returned is what the chart
+ * draws.
+ *
+ * Sorting follows the chart type. On a line, area or scatter chart the x axis
+ * is a scale, so sorting orders it; sorting a line by its values would join the
+ * points out of sequence. Bars and pies are categories, so they sort by value.
+ * The limit counts x values, so a long-format result is not cut off mid-series.
+ */
+export function prepareChart(spec: ChartSpec, rows: Record<string, unknown>[]): PreparedChart {
+  const pivoted = Boolean(spec.series) && spec.type !== 'pie' && spec.type !== 'scatter';
+  const { data, series } = pivoted
+    ? pivot(spec, spec.series!, rows)
+    : { data: rows, series: spec.y.map((key) => ({ key, label: key })) };
+
+  const value = (point: Record<string, unknown>) =>
+    pivoted
+      ? series.reduce((sum, entry) => sum + Number(point[entry.key] ?? 0), 0)
+      : Number(point[spec.y[0]] ?? 0);
+
+  const direction = spec.sort === 'asc' ? 1 : -1;
   const sorted =
     spec.sort === 'none'
-      ? rows
-      : [...rows].sort((a, b) => {
-          const left = Number(a[key] ?? 0);
-          const right = Number(b[key] ?? 0);
-          return spec.sort === 'asc' ? left - right : right - left;
-        });
-  return sorted.slice(0, spec.limit);
+      ? data
+      : [...data].sort((a, b) =>
+          direction *
+          (ORDERED_AXIS.has(spec.type) ? compareAxis(a[spec.x], b[spec.x]) : value(a) - value(b)),
+        );
+
+  return { data: sorted.slice(0, spec.limit), series };
 }
 
 /** Hover card. Values are shown in full precision, never the axis abbreviation. */
@@ -57,7 +117,7 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-md border border-line bg-elevated px-2.5 py-1.5 shadow-lg">
-      <p className="mb-1 text-[11px] font-medium text-ink">{formatCell(label)}</p>
+      <p className="mb-1 text-[11px] font-medium text-ink">{formatAxisLabel(label)}</p>
       <ul className="space-y-0.5">
         {payload.map((entry, index) => (
           <li key={index} className="flex items-center gap-2 text-[11.5px]">
@@ -97,8 +157,8 @@ function Legend({ keys }: { keys: string[] }) {
 }
 
 export function ChartView({ spec, rows }: { spec: ChartSpec; rows: Record<string, unknown>[] }) {
-  const data = prepareRows(spec, rows);
-  const multi = spec.y.length > 1;
+  const { data, series } = prepareChart(spec, rows);
+  const multi = series.length > 1;
 
   const axes = (
     <>
@@ -112,6 +172,7 @@ export function ChartView({ spec, rows }: { spec: ChartSpec; rows: Record<string
         axisLine={{ stroke: GRID }}
         tickMargin={8}
         minTickGap={12}
+        tickFormatter={(value) => formatAxisLabel(value)}
         label={
           spec.xLabel
             ? { value: spec.xLabel, position: 'insideBottom', offset: -2, ...AXIS }
@@ -142,18 +203,19 @@ export function ChartView({ spec, rows }: { spec: ChartSpec; rows: Record<string
       <figcaption className="mb-1 text-[13px] font-semibold tracking-tight text-ink">
         {spec.title}
       </figcaption>
-      {multi && <Legend keys={spec.y} />}
+      {multi && <Legend keys={series.map((entry) => entry.label)} />}
 
       <div className="min-h-[220px] flex-1">
         <ResponsiveContainer width="100%" height="100%">
           {spec.type === 'line' ? (
             <LineChart data={data} margin={{ top: 4, right: 12, bottom: spec.xLabel ? 16 : 4, left: 0 }}>
               {axes}
-              {spec.y.map((key, index) => (
+              {series.map(({ key, label }, index) => (
                 <Line
                   key={key}
                   type="monotone"
                   dataKey={key}
+                  name={label}
                   stroke={seriesColor(index)}
                   strokeWidth={2}
                   dot={false}
@@ -164,11 +226,12 @@ export function ChartView({ spec, rows }: { spec: ChartSpec; rows: Record<string
           ) : spec.type === 'area' ? (
             <AreaChart data={data} margin={{ top: 4, right: 12, bottom: spec.xLabel ? 16 : 4, left: 0 }}>
               {axes}
-              {spec.y.map((key, index) => (
+              {series.map(({ key, label }, index) => (
                 <Area
                   key={key}
                   type="monotone"
                   dataKey={key}
+                  name={label}
                   stackId={spec.stacked ? '1' : undefined}
                   stroke={seriesColor(index)}
                   strokeWidth={2}
@@ -205,10 +268,11 @@ export function ChartView({ spec, rows }: { spec: ChartSpec; rows: Record<string
           ) : (
             <BarChart data={data} margin={{ top: 4, right: 12, bottom: spec.xLabel ? 16 : 4, left: 0 }}>
               {axes}
-              {spec.y.map((key, index) => (
+              {series.map(({ key, label }, index) => (
                 <Bar
                   key={key}
                   dataKey={key}
+                  name={label}
                   stackId={spec.stacked ? '1' : undefined}
                   fill={seriesColor(index)}
                   // Rounded data-end only, anchored to the baseline.
@@ -223,7 +287,7 @@ export function ChartView({ spec, rows }: { spec: ChartSpec; rows: Record<string
 
       {spec.type === 'pie' && (
         <div className="mt-2">
-          <Legend keys={data.map((row) => formatCell(row[spec.x]))} />
+          <Legend keys={data.map((row) => formatAxisLabel(row[spec.x]))} />
         </div>
       )}
     </figure>
