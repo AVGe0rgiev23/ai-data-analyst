@@ -9,7 +9,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-0a0c0e?style=flat-square&logo=typescript&logoColor=3178c6">
   <img alt="DuckDB" src="https://img.shields.io/badge/DuckDB-in--process-0a0c0e?style=flat-square&logo=duckdb&logoColor=fff000">
   <img alt="AI SDK 7" src="https://img.shields.io/badge/AI_SDK-7-0a0c0e?style=flat-square&logo=vercel&logoColor=white">
-  <img alt="367 tests passing" src="https://img.shields.io/badge/tests-367_passing-2dc8d6?style=flat-square&labelColor=0a0c0e&logo=vitest&logoColor=white">
+  <img alt="404 tests passing" src="https://img.shields.io/badge/tests-404_passing-2dc8d6?style=flat-square&labelColor=0a0c0e&logo=vitest&logoColor=white">
   <img alt="Evaluation 26 of 26" src="https://img.shields.io/badge/eval-26%2F26-46c98a?style=flat-square&labelColor=0a0c0e">
 </p>
 
@@ -39,11 +39,15 @@ This project treats that as a defect to be caught, not a risk to be disclaimed. 
 
 ## ◆ See it work
 
+<img alt="Analysis view: the question, a failed query the agent corrected, a quarterly revenue table, and a four-region line chart, with a badge confirming all 15 figures trace to a result set" src="docs/assets/analysis.png" width="100%">
+
+<p align="center"><sub><b>One question, start to finish.</b> The agent's second query fails, it reads DuckDB's error and rewrites it, charts the stored result, and answers — and all 15 figures in the answer trace to a result set.</sub></p>
+
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img alt="Bar chart of completed revenue by product, rendered from a stored result set" src="docs/assets/chart.png">
-      <p><b>Charts can't invent data.</b> The model only names columns. Rows are loaded from the stored result set, and the spec is rejected if it references a column that result doesn't have.</p>
+      <img alt="Line chart of completed revenue by quarter with one line per region, rendered from a stored result set" src="docs/assets/chart.png">
+      <p><b>Charts can't invent data.</b> The model only names columns — here, one line per <code>region</code>. Rows are loaded from the stored result set, and the spec is rejected if it references a column that result doesn't have.</p>
     </td>
     <td width="50%" valign="top">
       <img alt="Agent step timeline: a query fails with a DuckDB binder error, the agent reads the error and retries successfully" src="docs/assets/self-correction.png">
@@ -225,7 +229,7 @@ Written down rather than discovered:
 - **Results:** a query stores at most 1,000 rows and times out after 15 seconds; the model reads at most 50 rows of any result.
 - **Agent:** up to 12 steps per question.
 - **Free models are rate limited** (roughly 20 requests a minute plus a daily cap). A 429 becomes a message saying how long to wait.
-- **The validator** doesn't read spelled-out quantities (*"two orders"*) or magnitude words (*"1.2 million"*).
+- **The validator checks figures, not wording.** It doesn't read spelled-out quantities (*"two orders"*) or magnitude words (*"1.2 million"*), and it won't notice a period named wrongly in prose. A decline written as a positive figure (*"fell 12%"* for −12%) is flagged, and so is a comparison that uses a synonym for a queried column (*"percentage increase"* for `pct_growth`).
 
 ## ◆ Roadmap
 
