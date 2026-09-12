@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 488" width="1280" height="488" role="img" aria-labelledby="title desc">
+  <title id="title">AI Data Analyst</title>
+  <desc id="desc">Ask your data anything in plain English. Every figure is traced to the SQL that produced it.</desc>
+  <style>
+    .pulse { animation: pulse 2.4s ease-in-out infinite; }
+    .question { animation: question 9s ease-out infinite both; }
+    .typing { transform: translateX(440px); animation: typing 9s steps(52, end) infinite both; }
+    .caret { transform: translateX(440px); animation: typing 9s steps(52, end) infinite both, blink 0.9s step-end infinite; }
+    .step-done { animation: stepDone 9s ease-out infinite both; }
+    .bar { transform-box: fill-box; transform-origin: 50% 100%; animation: grow 9s cubic-bezier(.2,.8,.2,1) infinite both; }
+    .badge { animation: badge 9s ease-out infinite both; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+    @keyframes question { 0% { opacity: 0; transform: translateY(6px); } 5%,93% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+    @keyframes typing { 0%,9% { transform: translateX(0); } 32%,100% { transform: translateX(440px); } }
+    @keyframes blink { 50% { opacity: 0; } }
+    @keyframes stepDone { 0%,32% { opacity: 0; } 36%,93% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes grow { 0%,37% { transform: scaleY(0); } 48%,93% { transform: scaleY(1); } 100% { transform: scaleY(0); } }
+    @keyframes badge { 0%,56% { opacity: 0; transform: translateY(4px); } 61%,93% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .pulse, .question, .typing, .caret, .step-done, .bar, .badge { animation: none !important; }
+      .caret { opacity: 0; }
+    }
+  </style>
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="rgba(255,255,255,0.045)" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="fade" cx="72%" cy="45%" r="70%">
+      <stop offset="0" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="gridMask"><rect width="1280" height="488" fill="url(#fade)"/></mask>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#2dc8d6" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#2dc8d6" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="sqlClip"><rect x="746" y="208" width="440" height="22"/></clipPath>
+    <clipPath id="frame"><rect width="1280" height="488" rx="20"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="1280" height="488" fill="#0a0c0e"/>
+    <rect width="1280" height="488" fill="url(#grid)" mask="url(#gridMask)"/>
+    <ellipse cx="955" cy="244" rx="420" ry="260" fill="url(#glow)"/>
+
+    <!-- Left: identity -->
+    <g>
+      <rect x="80" y="104" width="190" height="30" rx="15" fill="rgba(45,200,214,0.13)" stroke="rgba(45,200,214,0.38)"/>
+      <circle class="pulse" cx="99" cy="119" r="4" fill="#2dc8d6"/>
+      <text x="113" y="123.5" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#2dc8d6">grounded analytics</text>
+
+      <text x="78" y="210" font-family="'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="60" font-weight="600" letter-spacing="-1.6" fill="#e6e9ec">AI Data Analyst</text>
+      <text x="80" y="258" font-family="'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" fill="#99a2ab">Ask your data anything in plain English.</text>
+      <text x="80" y="290" font-family="'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" fill="#99a2ab">Every figure is traced to the SQL that produced it.</text>
+      <g class="fade-soft">
+      <rect x="80" y="334" width="178.3" height="30" rx="7" fill="#131719" stroke="rgba(255,255,255,0.10)"/>
+      <path d="M93 349.5 l3.2 3.2 l6-6.4" fill="none" stroke="#46c98a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="110" y="353.5" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#99a2ab">SELECT-only guard</text>
+    </g>
+<g class="fade-soft">
+      <rect x="270.3" y="334" width="146.7" height="30" rx="7" fill="#131719" stroke="rgba(255,255,255,0.10)"/>
+      <path d="M283.3 349.5 l3.2 3.2 l6-6.4" fill="none" stroke="#46c98a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="300.3" y="353.5" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#99a2ab">cited results</text>
+    </g>
+<g class="fade-soft">
+      <rect x="429" y="334" width="170.4" height="30" rx="7" fill="#131719" stroke="rgba(255,255,255,0.10)"/>
+      <path d="M442 349.5 l3.2 3.2 l6-6.4" fill="none" stroke="#46c98a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="459" y="353.5" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#99a2ab">claims validator</text>
+    </g>
+    </g>
+
+    <!-- Right: a miniature of the analysis view -->
+    <g>
+      <rect x="700" y="64" width="508" height="360" rx="14" fill="#131719" stroke="rgba(255,255,255,0.10)"/>
+      <circle cx="724" cy="85" r="4.5" fill="rgba(255,255,255,0.18)"/>
+      <circle cx="740" cy="85" r="4.5" fill="rgba(255,255,255,0.18)"/>
+      <circle cx="756" cy="85" r="4.5" fill="rgba(255,255,255,0.18)"/>
+      <text x="776" y="89" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#6d7780">analysis · global_sales · 1,817 rows</text>
+      <line x1="700" y1="106" x2="1208" y2="106" stroke="rgba(255,255,255,0.10)"/>
+
+      <g class="question">
+        <text x="724" y="132" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10.5" letter-spacing="1" fill="#6d7780">YOU</text>
+        <rect x="760" y="116" width="252" height="26" rx="7" fill="#181c1f" stroke="rgba(255,255,255,0.10)"/>
+        <text x="772" y="133.5" font-family="'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" fill="#e6e9ec">Which product earns the most?</text>
+      </g>
+
+      <g>
+        <circle cx="731" cy="195" r="7.5" fill="none" stroke="#46c98a" stroke-width="1.5" class="step-done"/>
+        <path class="step-done" d="M727.6 195.2 l2.3 2.3 l4.2 -4.6" fill="none" stroke="#46c98a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="746" y="199.5" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12.5" fill="#e6e9ec">run_sql</text>
+        <text class="step-done" x="808" y="199.5" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#6d7780">6 rows · 4 ms · result f6726d90</text>
+        <g clip-path="url(#sqlClip)">
+          <text x="746" y="223" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#99a2ab"><tspan fill="#2dc8d6">SELECT</tspan> product, SUM(revenue) <tspan fill="#2dc8d6">FROM</tspan> sales <tspan fill="#2dc8d6">GROUP BY</tspan> 1</text>
+          <rect class="typing" x="746" y="208" width="440" height="22" fill="#131719"/>
+          <rect class="caret" x="746" y="211" width="7" height="15" fill="#2dc8d6"/>
+        </g>
+      </g>
+
+      <line x1="724" y1="364.5" x2="1184" y2="364.5" stroke="rgba(255,255,255,0.10)"/>
+      <rect class="bar" style="animation-delay:0.00s" x="736" y="260" width="52" height="104" rx="4" fill="#2dc8d6" fill-opacity="1"/>
+      <rect class="bar" style="animation-delay:0.14s" x="812" y="301.375" width="52" height="62.62499999999999" rx="4" fill="#2dc8d6" fill-opacity="0.42"/>
+      <rect class="bar" style="animation-delay:0.28s" x="888" y="319.125" width="52" height="44.875" rx="4" fill="#2dc8d6" fill-opacity="0.42"/>
+      <rect class="bar" style="animation-delay:0.42s" x="964" y="320.125" width="52" height="43.875" rx="4" fill="#2dc8d6" fill-opacity="0.42"/>
+      <rect class="bar" style="animation-delay:0.56s" x="1040" y="322.625" width="52" height="41.375" rx="4" fill="#2dc8d6" fill-opacity="0.42"/>
+      <rect class="bar" style="animation-delay:0.70s" x="1116" y="335.6666666666667" width="52" height="28.333333333333336" rx="4" fill="#2dc8d6" fill-opacity="0.42"/>
+
+      <g class="badge">
+        <rect x="724" y="380" width="262" height="28" rx="7" fill="rgba(70,201,138,0.12)" stroke="rgba(70,201,138,0.40)"/>
+        <path d="M737 394.5 l3 3 l5.6 -6" fill="none" stroke="#46c98a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="753" y="398.5" font-family="'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#46c98a">All claims trace to a result set</text>
+      </g>
+    </g>
+  </g>
+</svg>
