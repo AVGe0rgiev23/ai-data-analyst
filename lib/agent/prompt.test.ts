@@ -86,6 +86,14 @@ describe('buildSystemPrompt', () => {
   it('binds charts to a queried result rather than model-supplied numbers', () => {
     expect(buildSystemPrompt(source)).toMatch(/result_id of a query you already ran/i);
   });
+
+  it('keeps answers to the markdown the answer panel renders', () => {
+    // Observed failure: a growth answer carried a LaTeX \[ \frac{…} \] block and
+    // a ![chart](chart:<id>) image link, both of which render as raw text.
+    const prompt = buildSystemPrompt(source);
+    expect(prompt).toMatch(/no LaTeX/i);
+    expect(prompt).toMatch(/image syntax/i);
+  });
 });
 
 describe('untrusted dataset content in the prompt', () => {
