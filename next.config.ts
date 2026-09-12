@@ -23,7 +23,6 @@ const nextConfig: NextConfig = {
     '/api/sources': DUCKDB_NATIVE,
     '/api/query': DUCKDB_NATIVE,
     '/api/chat': DUCKDB_NATIVE,
-    '/api/duckdb-smoke': DUCKDB_NATIVE,
   },
 };
 
