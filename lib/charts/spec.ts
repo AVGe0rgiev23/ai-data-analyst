@@ -19,7 +19,7 @@ export const chartSpecSchema = z.object({
     .enum(['none', 'asc', 'desc'])
     .default('none')
     .describe(
-      'Line, area and scatter charts sort along the x axis (asc is chronological). Bar and pie charts sort by value. none keeps the query order.',
+      'Line, area and scatter charts, and any chart whose x values are dates or periods, sort along the x axis (asc is chronological). Other bar and pie charts sort by value. none keeps the query order.',
     ),
   limit: z
     .number()

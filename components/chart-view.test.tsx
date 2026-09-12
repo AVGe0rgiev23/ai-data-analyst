@@ -72,6 +72,32 @@ describe('prepareChart with a series column', () => {
     expect(series).toHaveLength(3);
   });
 
+  it('keeps a bar chart over dates in chronological order, whatever the totals', () => {
+    // Observed live: sort "asc" on quarterly bars put 2026-04 before 2026-01,
+    // because 2026-01 had the larger total.
+    const quarterly = [
+      { quarter: '2026-01-01 00:00:00', region: 'North', revenue: 900 },
+      { quarter: '2025-10-01 00:00:00', region: 'North', revenue: 500 },
+      { quarter: '2026-04-01 00:00:00', region: 'North', revenue: 700 },
+    ];
+    const { data } = prepareChart(
+      { ...line, type: 'bar', x: 'quarter', sort: 'asc' },
+      quarterly,
+    );
+    expect(data.map((point) => point.quarter)).toEqual([
+      '2025-10-01 00:00:00', '2026-01-01 00:00:00', '2026-04-01 00:00:00',
+    ]);
+  });
+
+  it('treats year-quarter labels as dates too', () => {
+    const labelled = [
+      { quarter: '2025-Q2', region: 'North', revenue: 100 },
+      { quarter: '2025-Q1', region: 'North', revenue: 300 },
+    ];
+    const { data } = prepareChart({ ...line, type: 'bar', x: 'quarter', sort: 'desc' }, labelled);
+    expect(data.map((point) => point.quarter)).toEqual(['2025-Q2', '2025-Q1']);
+  });
+
   it('sorts a grouped bar chart by the total across its series', () => {
     const { data } = prepareChart({ ...line, type: 'bar', x: 'region', series: 'month', sort: 'desc' }, long);
     // South 305, North 310

@@ -32,6 +32,19 @@ export type PreparedChart = { data: Record<string, unknown>[]; series: ChartSeri
 /** Chart types whose x axis is an ordered scale rather than a set of categories. */
 const ORDERED_AXIS = new Set<ChartSpec['type']>(['line', 'area', 'scatter']);
 
+/**
+ * Dates, timestamps, year-months and year-quarters. A bare four-digit number is
+ * deliberately not included: it is as likely to be an id as a year, and ids on a
+ * bar chart should still rank by value.
+ */
+const PERIOD = /^\d{4}-(?:\d{2}(?:-\d{2})?|Q[1-4])(?:[ T][\d:.]+Z?)?$/i;
+
+/** Time is ordered on any chart type: bars over quarters must not rank by total. */
+function sortsAlongX(spec: ChartSpec, data: Record<string, unknown>[]): boolean {
+  if (ORDERED_AXIS.has(spec.type)) return true;
+  return data.length > 0 && data.every((point) => PERIOD.test(String(point[spec.x] ?? '')));
+}
+
 /** Numbers numerically; text naturally, which also orders ISO dates correctly. */
 function compareAxis(left: unknown, right: unknown): number {
   if (typeof left === 'number' && typeof right === 'number') return left - right;
@@ -76,10 +89,11 @@ function pivot(spec: ChartSpec, column: string, rows: Record<string, unknown>[])
  * themselves are never transformed — what the SQL returned is what the chart
  * draws.
  *
- * Sorting follows the chart type. On a line, area or scatter chart the x axis
- * is a scale, so sorting orders it; sorting a line by its values would join the
- * points out of sequence. Bars and pies are categories, so they sort by value.
- * The limit counts x values, so a long-format result is not cut off mid-series.
+ * Sorting follows the axis. On a line, area or scatter chart the x axis is a
+ * scale, and so is any axis of dates or periods, so sorting orders it; ranking
+ * points in time by value would put 2026-04 before 2026-01. Other bars and pies
+ * are categories, so they sort by value. The limit counts x values, so a
+ * long-format result is not cut off mid-series.
  */
 export function prepareChart(spec: ChartSpec, rows: Record<string, unknown>[]): PreparedChart {
   const pivoted = Boolean(spec.series) && spec.type !== 'pie' && spec.type !== 'scatter';
@@ -93,12 +107,12 @@ export function prepareChart(spec: ChartSpec, rows: Record<string, unknown>[]): 
       : Number(point[spec.y[0]] ?? 0);
 
   const direction = spec.sort === 'asc' ? 1 : -1;
+  const alongX = sortsAlongX(spec, data);
   const sorted =
     spec.sort === 'none'
       ? data
       : [...data].sort((a, b) =>
-          direction *
-          (ORDERED_AXIS.has(spec.type) ? compareAxis(a[spec.x], b[spec.x]) : value(a) - value(b)),
+          direction * (alongX ? compareAxis(a[spec.x], b[spec.x]) : value(a) - value(b)),
         );
 
   return { data: sorted.slice(0, spec.limit), series };
