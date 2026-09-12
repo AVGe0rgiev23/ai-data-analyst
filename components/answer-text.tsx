@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, type ReactNode } from 'react';
+import { BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/ui/cn';
 
 /*
@@ -67,6 +68,9 @@ function splitRow(line: string): string[] {
 
 const DELIMITER = /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/;
 
+/** A markdown image on its own line. Models use it to "embed" the chart they made. */
+const IMAGE = /^!\[([^\]]*)\]\([^)]*\)$/;
+
 export function AnswerText({ text, className }: { text: string; className?: string }) {
   if (!text.trim()) return null;
 
@@ -102,6 +106,50 @@ export function AnswerText({ text, className }: { text: string; className?: stri
 
     if (!trimmed) {
       flushList();
+      continue;
+    }
+
+    // Display math. The prompt asks for no LaTeX, but models still write it,
+    // and split into "\[" and "\]" paragraphs it reads as a rendering fault.
+    // The formula is kept whole and shown in monospace — never dropped.
+    if (trimmed.startsWith('\\[')) {
+      flushList();
+      const body: string[] = [];
+      let cursor = index;
+      let current = trimmed.slice(2);
+      for (;;) {
+        const end = current.indexOf('\\]');
+        if (end >= 0) {
+          body.push(current.slice(0, end));
+          break;
+        }
+        body.push(current);
+        if (cursor + 1 >= lines.length) break;
+        cursor += 1;
+        current = lines[cursor];
+      }
+      blocks.push(
+        <pre
+          key={`math-${index}`}
+          className="my-2 overflow-x-auto rounded-md border border-line-subtle bg-sunken px-2.5 py-2 font-mono text-[11.5px] leading-relaxed text-ink-secondary"
+        >
+          {body.join('\n').trim()}
+        </pre>,
+      );
+      index = cursor;
+      continue;
+    }
+
+    // The chart already sits beside the answer; the link itself shows nothing.
+    const image = trimmed.match(IMAGE);
+    if (image) {
+      flushList();
+      blocks.push(
+        <p key={`img-${index}`} className="my-1.5 flex items-center gap-1.5 text-[12px] text-ink-muted">
+          <BarChart3 size={12} strokeWidth={2} className="shrink-0 text-ink-faint" />
+          Chart: {image[1] || 'untitled'}
+        </p>,
+      );
       continue;
     }
 
