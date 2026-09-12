@@ -6,11 +6,11 @@ import { ingestCsvToParquet, toTableName } from '@/lib/ingest/ingest';
 import { profileTable } from '@/lib/profile/profile';
 import { createSession } from '@/lib/duckdb/session';
 import { createSource } from '@/lib/db/sources';
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE } from '@/lib/ingest/limits';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-const MAX_BYTES = 100 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['.csv', '.tsv', '.txt'];
 
 /**
@@ -73,8 +73,8 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return Response.json({ error: 'No file provided' }, { status: 400 });
   }
-  if (file.size > MAX_BYTES) {
-    return Response.json({ error: 'File exceeds the 100 MB limit' }, { status: 413 });
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return Response.json({ error: UPLOAD_TOO_LARGE }, { status: 413 });
   }
   if (file.size === 0) {
     return Response.json({ error: 'That file is empty.' }, { status: 400 });

@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import { AlertCircle, Check, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/ui/cn';
 import { formatBytes } from '@/lib/ui/format';
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE } from '@/lib/ingest/limits';
 import { Button } from '@/components/ui/primitives';
 
 type Phase = 'idle' | 'transfer' | 'profile' | 'done';
@@ -67,6 +68,12 @@ export function UploadDropzone({ onUploaded }: { onUploaded: (sourceId: string) 
 
   const upload = useCallback(
     async (next: File) => {
+      // The route would refuse it anyway, but only after the whole file had
+      // crossed the network.
+      if (next.size > MAX_UPLOAD_BYTES) {
+        setError(UPLOAD_TOO_LARGE);
+        return;
+      }
       setFile(next);
       setError(null);
       setFraction(0);
@@ -204,7 +211,9 @@ export function UploadDropzone({ onUploaded }: { onUploaded: (sourceId: string) 
         <p className="text-[13px] font-medium text-ink">
           {dragging ? 'Release to upload' : 'Drop a CSV, or click to choose'}
         </p>
-        <p className="mt-1 text-[11.5px] text-ink-muted">CSV, up to a few hundred MB</p>
+        <p className="mt-1 text-[11.5px] text-ink-muted">
+          CSV, up to {formatBytes(MAX_UPLOAD_BYTES)}
+        </p>
       </label>
 
       {error && (
