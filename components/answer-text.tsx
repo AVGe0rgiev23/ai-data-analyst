@@ -15,7 +15,9 @@ import { cn } from '@/lib/ui/cn';
  * an answer must never be silently truncated by its renderer.
  */
 
-const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\[[0-9a-f-]{8,}\]|【[^】]+】)/g;
+// Bold is tried before emphasis, so "**x**" never splits into two "*x*". An
+// emphasis must open on a non-space, so "5 * 3 * 2" stays arithmetic.
+const INLINE = /(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`|\[[0-9a-f-]{8,}\]|【[^】]+】)/g;
 
 function inline(text: string, keyPrefix: string): ReactNode[] {
   return text.split(INLINE).filter(Boolean).map((token, index) => {
@@ -25,6 +27,13 @@ function inline(text: string, keyPrefix: string): ReactNode[] {
         <strong key={key} className="font-semibold text-ink">
           {token.slice(2, -2)}
         </strong>
+      );
+    }
+    if (token.length > 2 && token.startsWith('*') && token.endsWith('*')) {
+      return (
+        <em key={key} className="italic text-ink">
+          {token.slice(1, -1)}
+        </em>
       );
     }
     if (token.startsWith('`') && token.endsWith('`')) {

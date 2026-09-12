@@ -24,6 +24,14 @@ describe('AnswerText', () => {
     expect(screen.getByText('All arithmetic ran in SQL.')).toBeDefined();
   });
 
+  it('renders single-asterisk emphasis instead of showing the asterisks', () => {
+    // Observed in a live answer: "*Asia Pacific* grew the most".
+    const { container } = render(<AnswerText text="*Asia Pacific* grew the most, and **bold** still works." />);
+    expect(container.textContent).not.toContain('*');
+    expect(container.querySelector('em')?.textContent).toBe('Asia Pacific');
+    expect(container.querySelector('strong')?.textContent).toBe('bold');
+  });
+
   it('shows a chart image link as a reference instead of raw markdown', () => {
     const text = '![Completed Order Revenue by Month](chart:b007d561-842a-4d57-a44b-e93bd17c3621)';
     render(<AnswerText text={text} />);
