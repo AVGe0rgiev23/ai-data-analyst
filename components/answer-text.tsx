@@ -25,14 +25,15 @@ function inline(text: string, keyPrefix: string): ReactNode[] {
     if (token.startsWith('**') && token.endsWith('**')) {
       return (
         <strong key={key} className="font-semibold text-ink">
-          {token.slice(2, -2)}
+          {inline(token.slice(2, -2), key)}
         </strong>
       );
     }
     if (token.length > 2 && token.startsWith('*') && token.endsWith('*')) {
       return (
+        // Parsed again, so a citation inside emphasis still becomes a chip.
         <em key={key} className="italic text-ink">
-          {token.slice(1, -1)}
+          {inline(token.slice(1, -1), key)}
         </em>
       );
     }

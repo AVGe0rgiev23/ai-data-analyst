@@ -32,6 +32,15 @@ describe('AnswerText', () => {
     expect(container.querySelector('strong')?.textContent).toBe('bold');
   });
 
+  it('keeps a citation chip inside emphasis', () => {
+    // Observed live: "*Values taken from the query 【0214ae9f-…】*" showed the raw id.
+    const { container } = render(
+      <AnswerText text="*Values taken from the growth query 【0214ae9f-6066-44dc-a0e2-17e8f8aa64ed】*." />,
+    );
+    expect(container.textContent).not.toContain('0214ae9f-6066');
+    expect(container.querySelector('em [title="Result 0214ae9f-6066-44dc-a0e2-17e8f8aa64ed"]')).not.toBeNull();
+  });
+
   it('shows a chart image link as a reference instead of raw markdown', () => {
     const text = '![Completed Order Revenue by Month](chart:b007d561-842a-4d57-a44b-e93bd17c3621)';
     render(<AnswerText text={text} />);
