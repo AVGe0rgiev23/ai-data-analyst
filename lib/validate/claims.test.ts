@@ -102,6 +102,35 @@ describe('detector 1: numeric claims', () => {
     expect(unsupportedTexts('See result_id 2ba6c05b-aa43-43aa-a4d4-2093d42f5167.')).toEqual([]);
   });
 
+  describe('negative figures', () => {
+    const growth = result({
+      columns: [
+        { name: 'region', type: 'VARCHAR' },
+        { name: 'pct_growth', type: 'DOUBLE' },
+      ],
+      rows: [
+        { region: 'Latin America', pct_growth: -12.034632241471446 },
+        { region: 'Asia Pacific', pct_growth: 252.07722182180606 },
+      ],
+      rowCount: 2,
+    });
+
+    it('accepts a negative figure written with a minus sign', () => {
+      // Observed in a real answer's table, with an en dash as the minus.
+      expect(unsupportedTexts('| Latin America | –12.03 % |', [growth])).toEqual([]);
+      expect(unsupportedTexts('Latin America changed by −12.03%.', [growth])).toEqual([]);
+    });
+
+    it('flags a figure whose written sign contradicts the result', () => {
+      expect(unsupportedTexts('Asia Pacific changed by -252.08%.', [growth])).toContain('-252.08%');
+    });
+
+    it('does not read a hyphenated range as a negative number', () => {
+      const counts = result({ columns: [{ name: 'orders', type: 'BIGINT' }], rows: [{ orders: 5 }, { orders: 10 }], rowCount: 2 });
+      expect(unsupportedTexts('Customers placed 5-10 orders.', [counts])).toEqual([]);
+    });
+  });
+
   it('marks an unsupported number with the strict severity', () => {
     const report = validateClaims('Revenue was $999.99.', [result()]);
     expect(report.unsupported[0].severity).toBe('unsupported_number');
@@ -147,6 +176,22 @@ describe('detector 2: quantitative comparisons', () => {
       [result()],
     );
     expect(report.unsupported.filter((c) => c.kind === 'comparison')).toEqual([]);
+  });
+
+  it('stays quiet when "more" or "less" forms an adverb of manner', () => {
+    // Observed in a real answer: "grew more modestly and Latin America actually
+    // declined" was flagged as a comparison "by modestly and Latin". The words
+    // after "more" said how something grew, not what it was measured by.
+    const report = validateClaims(
+      'North America followed closely, while Europe grew more modestly and Latin America actually declined. Acme spent less consistently.',
+      [result()],
+    );
+    expect(report.unsupported.filter((c) => c.kind === 'comparison')).toEqual([]);
+  });
+
+  it('still flags a measure that follows a superlative, even one ending in -ly', () => {
+    const report = validateClaims('Globex has the highest monthly order count.', [result()]);
+    expect(report.unsupported.filter((c) => c.kind === 'comparison')).toHaveLength(1);
   });
 });
 

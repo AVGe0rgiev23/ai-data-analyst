@@ -307,7 +307,14 @@ function metadataSupportFor(
   return null;
 }
 
-const NUMBER_PATTERN = /[$£€]?\s?\d[\d,]*(?:\.\d+)?\s?%?/g;
+/**
+ * A written minus is part of the figure: "–12.03 %" is a claim about -12.03, and
+ * dropping the sign both flagged it as unsourced and let "-252.08%" pass against
+ * a result of +252.08. A hyphen counts as a sign only where it cannot be joining
+ * two things, so "5-10 orders" is still a 5 and a 10. (Dashes and the minus
+ * sign are folded to "-" by normaliseUnicode before this runs.)
+ */
+const NUMBER_PATTERN = /[$£€]?\s?(?:(?<![\w.])-)?\d[\d,]*(?:\.\d+)?\s?%?/g;
 
 function findNumericClaims(prose: string, support: Support, facts: MetadataFact[]): Claim[] {
   const claims: Claim[] = [];
@@ -418,7 +425,7 @@ function findComparisonClaims(prose: string, support: Support): Claim[] {
   for (const match of prose.matchAll(pattern)) {
     const comparative = match[1];
     const rest = match[2] ?? '';
-    const measure = extractMeasure(rest);
+    const measure = extractMeasure(comparative, rest);
     if (!measure) continue;
 
     const words = splitWords(measure).filter((word) => !STOPWORDS.has(word));
@@ -444,12 +451,18 @@ function findComparisonClaims(prose: string, support: Support): Claim[] {
   return claims;
 }
 
+// These also build adverbs of manner: "grew more modestly", "less consistently".
+// Followed by an -ly word they describe how something happened, not what it was
+// measured by. Superlatives are not included: "highest monthly revenue" is a
+// real measure behind an -ly adjective.
+const ADVERB_BUILDERS = new Set(['more', 'less', 'most', 'least']);
+
 /**
  * Two conservative shapes only:
  *   "<comparative> ... by <measure>"  — the canonical "measured by" marker
  *   "<comparative> <measure>"         — an immediately following noun phrase
  */
-function extractMeasure(rest: string): string | null {
+function extractMeasure(comparative: string, rest: string): string | null {
   const byMeasure = rest.match(/\bby\s+([a-z][a-z\s_]{2,40})/i);
   if (byMeasure) return byMeasure[1].trim();
 
@@ -459,6 +472,7 @@ function extractMeasure(rest: string): string | null {
   const words = following[1].trim().split(/\s+/).slice(0, 3);
   if (words.length === 0) return null;
   if (PREPOSITIONS.has(words[0].toLowerCase())) return null;
+  if (ADVERB_BUILDERS.has(comparative.toLowerCase()) && /ly$/i.test(words[0])) return null;
 
   return words.join(' ');
 }
