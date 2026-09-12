@@ -94,21 +94,21 @@ The share and the order-count ranking may even be right — but no query produce
 ## ◆ How a question becomes an answer
 
 ```mermaid
-flowchart LR
-  Q(["Question"]) --> A{{"Agent<br/>up to 12 steps"}}
-  A -- get_schema --> P[("Column profile<br/>+ dictionary")]
-  A -- run_sql --> G["SQL guard<br/>DuckDB parser"]
-  G -- "not one SELECT" --> E["Refused<br/>error returned to agent"]
-  E -.-> A
-  G -- "one SELECT" --> D[("DuckDB<br/>locked session")]
+flowchart TD
+  Q(["Question"]) --> A{{"Agent · up to 12 steps"}}
+  A -->|get_schema| P[("Column profile<br/>+ dictionary")]
+  A -->|run_sql| G["SQL guard<br/>DuckDB's own parser"]
+  G -->|"anything but one SELECT"| E["Refused<br/>error goes back to the agent"]
+  G -->|"exactly one SELECT"| D[("DuckDB<br/>locked session")]
   D --> R[("Stored result<br/>result_id")]
-  R -- "≤ 50 rows" --> A
-  A -- make_chart --> C["Chart spec<br/>checked against result columns"]
+  R -.->|"at most 50 rows"| A
+  A -->|make_chart| C["Chart spec<br/>checked against result columns"]
+  A -->|final text| N["Answer"]
   R --> C
-  A --> N["Answer"]
   N --> V["Claims validator<br/>no model involved"]
   R --> V
-  V --> U(["Answer · SQL · chart · flags"])
+  C --> U(["Answer · SQL · chart · flags"])
+  V --> U
 ```
 
 1. **Upload.** The CSV is read by DuckDB with a full-file type scan, written to Parquet, stored privately in Vercel Blob, and profiled with `SUMMARIZE`: types, null rates, distinct counts, ranges, exact duplicate rows, and text columns that only *look* like dates.
