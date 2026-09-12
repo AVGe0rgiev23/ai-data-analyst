@@ -420,6 +420,9 @@ const STOPWORDS = new Set([
   'the', 'a', 'an', 'its', 'their', 'his', 'her', 'this', 'that', 'these', 'those',
   'total', 'overall', 'own', 'single', 'clear', 'very', 'just', 'only', 'all', 'each', 'any',
   'is', 'are', 'was', 'were', 'be', 'been', 'and', 'or', 'but', 'of', 'by',
+  // Hedges before an amount: "increased by about 233 %" names a size, not a
+  // measure. The amount itself is still checked by the numeric detector.
+  'about', 'around', 'roughly', 'nearly', 'almost', 'approximately', 'some',
 ]);
 
 function findComparisonClaims(prose: string, support: Support): Claim[] {

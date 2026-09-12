@@ -216,6 +216,16 @@ describe('detector 2: quantitative comparisons', () => {
     expect(report.unsupported.filter((c) => c.kind === 'comparison')).toEqual([]);
   });
 
+  it('stays quiet when "by" introduces an approximate amount rather than a measure', () => {
+    // Observed in a live answer: "grew the most, increasing its revenue by about
+    // 233 %" was flagged as a comparison "by about".
+    const report = validateClaims(
+      'Asia Pacific grew the most, increasing its revenue by about 233 %. Acme leads by roughly 34 orders.',
+      [result()],
+    );
+    expect(report.unsupported.filter((c) => c.kind === 'comparison')).toEqual([]);
+  });
+
   it('still flags a measure that follows a superlative, even one ending in -ly', () => {
     const report = validateClaims('Globex has the highest monthly order count.', [result()]);
     expect(report.unsupported.filter((c) => c.kind === 'comparison')).toHaveLength(1);
