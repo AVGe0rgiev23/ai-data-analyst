@@ -24,7 +24,7 @@ A web app where a user uploads a CSV/Excel file, connects a Postgres/MySQL datab
 | State | Auth + saved conversations + shareable links | Feels like a product, not a toy |
 | Schema context | Auto-profile + LLM-drafted, user-editable dictionary | Zero setup, improves with corrections |
 | Sandbox | Vercel Sandbox | Same platform, no extra vendor |
-| Model | `anthropic/claude-sonnet-5` via Vercel AI Gateway | Gateway gives fallback and observability |
+| Model | `dots-studio/dots-3-note-preview:free` via OpenRouter, with a fallback chain | Free models, no credit card and no paid credits. Verified to do both tool calling and structured output; fallbacks absorb free-tier rate limits. Superseded the AI Gateway, which returns 403 `customer_verification_required` until a card is on file. |
 
 ## Accuracy principles
 
@@ -33,16 +33,16 @@ These are requirements, not aspirations. Each maps to a concrete implementation 
 1. **Read-only by construction.** Every statement is parsed via DuckDB's `json_serialize_sql` and rejected unless the top-level statement is a `SELECT`. Parser-based, never regex — regex SQL guards are theatre. Attached external databases use `READ_ONLY` mode.
 2. **No number without a source.** The system prompt forbids stating any figure not present in a tool result. The final answer cites `result_id`s.
 3. **Truncation is never silent.** Every result carries `row_count` and `truncated`. If the model saw a capped result, it is told so explicitly and forbidden from generalizing over it.
-4. **Numeric-claim validation.** After the final answer, a deterministic pass extracts every number from the prose and confirms it appears in a cited result set. Unmatched numbers are flagged in the UI.
+4. **Numeric-claim validation.** *(Implemented — `lib/validate/claims.ts`, `POST /api/validate`.)* After the final answer, a deterministic pass extracts every number from the prose and confirms it appears in a cited result set. Unmatched numbers are flagged in the UI. A second, conservative detector flags quantitative *comparisons* measured by something no cited result contains — the class of error that carries no number at all, such as "the smallest customer by order count" over a result holding only revenue. Rows are loaded server-side by `result_id`; anything else in the request is ignored, and a result belonging to another source cannot lend support. Flags annotate the answer, never suppress it.
 5. **Stated assumptions, always.** How the agent interpreted "top customers" or "last quarter" is part of the answer. Genuine ambiguity triggers `ask_clarification` instead of a guess.
 6. **Verifiable by hand.** SQL is always shown and always editable, and re-running edited SQL bypasses the model entirely.
-7. **Measured, not assumed.** An eval set of ~20 questions over a known dataset with hand-computed expected answers, runnable as a script.
+7. **Measured, not assumed.** *(Implemented — `lib/eval/`, `pnpm eval`.)* An eval set of 20 questions plus 6 validator cases over a known 16-row dataset, every expected answer hand-computed and independently re-derived from the raw CSV. Runnable as a script against a live instance over HTTP. The engine and validator layers score 26/26; the agent layer is built and awaits model quota.
 
 ## Architecture
 
 - **Framework:** Next.js 16 App Router, TypeScript, Tailwind + shadcn/ui
 - **Runtime:** Vercel Functions, Fluid Compute, Node 24 (no Edge — DuckDB is a native module)
-- **AI:** AI SDK v6 via AI Gateway, `streamText` with tools and `stopWhen: stepCountIs(12)`
+- **AI:** AI SDK via OpenRouter (`@openrouter/ai-sdk-provider`), `streamText` with tools and `stopWhen: stepCountIs(12)`
 - **SQL engine:** `@duckdb/node-api` in-process, one DuckDB instance per request, data staged in `/tmp`
 - **Python:** Vercel Sandbox, created per analysis step, receives the input result set as Parquet
 - **App DB:** Neon Postgres (via Vercel Marketplace) with Drizzle

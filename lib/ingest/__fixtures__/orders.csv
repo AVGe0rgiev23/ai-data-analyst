@@ -1,0 +1,6 @@
+order_id,customer,amount,status,ordered_at
+1,Acme,120.50,paid,2026-01-04
+2,Globex,85.00,pending,2026-01-06
+3,Acme,240.25,paid,2026-02-11
+4,Initech,15.75,refunded,2026-02-19
+5,Globex,310.00,paid,2026-03-02
