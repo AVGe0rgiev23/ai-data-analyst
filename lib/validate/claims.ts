@@ -157,8 +157,10 @@ export function normaliseUnicode(text: string): string {
   return (
     text
       .replace(DASHES, '-')
-      // Only *between digits*, where it can only be a group separator.
-      .replace(new RegExp(`(?<=\\d)${SPACES.source}(?=\\d)`, 'g'), '')
+      // Only between a digit and a group of exactly three, the one place it can
+      // only be a thousands separator. "Q1 2025" is a label and a year: joining
+      // any digits made it 12025, a figure no result could ever support.
+      .replace(new RegExp(`(?<=\\d)${SPACES.source}(?=\\d{3}(?!\\d))`, 'g'), '')
       .replace(SPACES, ' ')
   );
 }
@@ -313,8 +315,10 @@ function metadataSupportFor(
  * a result of +252.08. A hyphen counts as a sign only where it cannot be joining
  * two things, so "5-10 orders" is still a 5 and a 10. (Dashes and the minus
  * sign are folded to "-" by normaliseUnicode before this runs.)
+ *
+ * Digits glued to a letter are part of a label, not a quantity: Q1, H2, FY2025.
  */
-const NUMBER_PATTERN = /[$£€]?\s?(?:(?<![\w.])-)?\d[\d,]*(?:\.\d+)?\s?%?/g;
+const NUMBER_PATTERN = /[$£€]?\s?(?:(?<![\w.])-)?(?<![A-Za-z0-9_])\d[\d,]*(?:\.\d+)?\s?%?/g;
 
 function findNumericClaims(prose: string, support: Support, facts: MetadataFact[]): Claim[] {
   const claims: Claim[] = [];

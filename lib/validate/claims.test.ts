@@ -131,6 +131,33 @@ describe('detector 1: numeric claims', () => {
     });
   });
 
+  describe('period labels', () => {
+    it('does not read a quarter label as a figure', () => {
+      // Observed in a real answer: "(e.g., Q1 = Jan-Mar)" flagged a bare 1.
+      expect(unsupportedTexts('Quarters align with calendar quarters (e.g., Q1 = Jan-Mar).')).toEqual([]);
+    });
+
+    it('does not fuse a quarter and its year across a narrow no-break space', () => {
+      // Observed: "Q1 2025", written with a narrow no-break space, became "Q12025" and was flagged as 12025.
+      const quarters = result({
+        columns: [{ name: 'quarter', type: 'TIMESTAMP' }, { name: 'revenue', type: 'DOUBLE' }],
+        rows: [
+          { quarter: '2025-01-01 00:00:00', revenue: 1 },
+          { quarter: '2026-04-01 00:00:00', revenue: 2 },
+        ],
+        rowCount: 2,
+      });
+      expect(
+        unsupportedTexts('Revenue in the first quarter (Q1\u202f2025) and the last (Q2\u202f2026).', [quarters]),
+      ).toEqual([]);
+    });
+
+    it('still joins a real thousands group written with a narrow no-break space', () => {
+      const r = result({ rows: [{ customer: 'Globex', total_revenue: 1195.75 }] });
+      expect(unsupportedTexts('Globex spent 1\u202f195.75.', [r])).toEqual([]);
+    });
+  });
+
   it('marks an unsupported number with the strict severity', () => {
     const report = validateClaims('Revenue was $999.99.', [result()]);
     expect(report.unsupported[0].severity).toBe('unsupported_number');
