@@ -71,15 +71,23 @@ export function ChatPanel({
   const [reports, setReports] = useState<Record<string, ValidationReport>>({});
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat', body: { sourceId } }),
+    // The answer reaches the page once, when the turn ends — not from the effect
+    // below. The text changes on every streamed delta, so emitting it there made
+    // each of several hundred deltas re-render the page as well as this panel.
+    // React stopped that with "Maximum update depth exceeded", thrown inside
+    // useChat's stream reader, which aborted the stream mid-sentence.
+    onFinish: ({ message }) => {
+      const { text } = extractStreamUpdates(message.parts as StreamPart[]);
+      if (text) onAnswer?.(text);
+    },
   });
 
   // Each handler fires only when its value actually changes. useChat hands back
   // a fresh messages array on every render, so re-emitting unconditionally made
   // the parent set state, re-render, and run this again — "Maximum update depth
-  // exceeded".
+  // exceeded". Result ids and charts change a few times per turn at most.
   const lastResultId = useRef<string | null>(null);
   const lastChartKey = useRef<string | null>(null);
-  const lastAnswer = useRef<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,12 +106,7 @@ export function ChatPanel({
       lastChartKey.current = key;
       onChartSpec?.(updates.chart.spec, updates.chart.resultId);
     }
-
-    if (updates.text && updates.text !== lastAnswer.current) {
-      lastAnswer.current = updates.text;
-      onAnswer?.(updates.text);
-    }
-  }, [messages, onResultId, onChartSpec, onAnswer]);
+  }, [messages, onResultId, onChartSpec]);
 
   const busy = status === 'streaming' || status === 'submitted';
 
